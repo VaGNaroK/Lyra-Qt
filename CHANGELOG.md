@@ -2,10 +2,14 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
-## [1.1.6] - 2026-05-31
+## [1.1.7] - 2026-06-01
 
 ### Adicionado
 * **Redução de Ruído via Rede Neural (RNNoise):** Inserida integração nativa com o modelo `cb.rnnn` para limpeza avançada de ruído de fundo, incluindo mecanismo de fallback seguro que força a recodificação (`aac`) caso o usuário esqueça o codec na opção "copy".
+
+## [1.1.6] - 2026-05-31
+
+### Adicionado
 * **Inspetor de Mídia Inteligente:** Nova aba "Info da Mídia" que exibe os metadados estruturados (Codec, Resolução, Canais, Bitrate, Idioma) utilizando o `ffprobe` com formatação JSON nativa.
 * **Qualidade Constante Inteligente (CRF / CQ):** Adicionado slider de "Qualidade Inteligente" (0 a 51) substituindo a necessidade de adivinhar o Bitrate, suportando `-crf` (CPU) e `-cq` (NVENC).
 * **Detecção Automática de Bordas (Auto-Crop):** Botão na aba de Filtros que utiliza o `cropdetect` do FFmpeg para analisar a mídia e preencher automaticamente os parâmetros de corte.
