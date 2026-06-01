@@ -1,0 +1,95 @@
+app-id: com.github.vagnarok.lyra
+branch: stable
+runtime: org.kde.Platform
+runtime-version: '6.7'
+sdk: org.kde.Sdk
+command: lyra
+
+finish-args:
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=dri
+  - --share=ipc
+  - --share=network
+  - --filesystem=home
+  - --talk-name=org.freedesktop.Notifications
+
+modules:
+# ----------------------------------------------------------------------------
+  # Modulo 0: Biblioteca de Segurança Kerberos (Exigida pelo PySide6 QtMultimedia)
+  # ----------------------------------------------------------------------------
+  - name: krb5
+    subdir: src
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://kerberos.org/dist/krb5/1.21/krb5-1.21.2.tar.gz
+        sha256: 9560941a9d843c0243a71b17a7ac6fe31c7cebb5bce3983db79e52ae7e850491
+
+  # ----------------------------------------------------------------------------
+  # Modulo 1: Dependências do Python (Instalação isolada dentro da Sandbox)
+  # ----------------------------------------------------------------------------
+  - name: python-dependencies
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+      - pip3 install --prefix=/app PySide6 yt-dlp
+
+  # ----------------------------------------------------------------------------
+  # Modulo 2: FFmpeg Estático (Poder Total com NVENC, x264, x265, etc)
+  # ----------------------------------------------------------------------------
+  - name: ffmpeg-static
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+      - curl -L -o ffmpeg.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+      - tar -xf ffmpeg.tar.xz
+      - cp ffmpeg-master-latest-linux64-gpl/bin/ffmpeg /app/bin/
+      - cp ffmpeg-master-latest-linux64-gpl/bin/ffprobe /app/bin/
+      - chmod +x /app/bin/ffmpeg /app/bin/ffprobe
+
+# ----------------------------------------------------------------------------
+  # Modulo 3: O Aplicativo Lyra-Qt (Isolamento de Código Ativo)
+  # ----------------------------------------------------------------------------
+  - name: lyra-app
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: .
+    build-commands:
+      # Criação da estrutura de pastas
+      - mkdir -p /app/share/lyra
+      - mkdir -p /app/bin
+      - mkdir -p /app/share/applications
+      - mkdir -p /app/share/icons/hicolor/scalable/apps
+      
+      # Cópia inteligente e recursiva de toda a arquitetura
+      - cp main.py done.wav lyra.svg /app/share/lyra/
+      - cp -r core /app/share/lyra/
+      - cp -r gui /app/share/lyra/
+      
+      # Atalhos e Ícones
+      - cp lyra.svg /app/share/icons/hicolor/scalable/apps/com.github.vagnarok.lyra.svg
+      - |
+        cat << EOF > /app/share/applications/com.github.vagnarok.lyra.desktop
+        [Desktop Entry]
+        Version=1.0
+        Type=Application
+        Name=Lyra Multimedia Converter
+        Exec=lyra
+        Icon=com.github.vagnarok.lyra
+        Categories=AudioVideo;Utility;
+        Terminal=false
+        StartupWMClass=lyra-multimedia-converter
+        EOF
+      - |
+        cat << 'EOF' > /app/bin/lyra
+        #!/bin/sh
+        exec python3 /app/share/lyra/main.py "$@"
+        EOF
+      - chmod +x /app/bin/lyra

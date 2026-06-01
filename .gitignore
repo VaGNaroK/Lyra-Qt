@@ -1,0 +1,42 @@
+# ==========================================
+# 🐍 Python (Cache e Arquivos Compilados)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ==========================================
+# 📦 Ambientes Virtuais
+# ==========================================
+venv/
+.venv/
+env/
+
+# ==========================================
+# 🐧 Build e Empacotamento (Flatpak / Linux)
+# ==========================================
+.flatpak-builder/
+*.flatpak
+*.deb
+
+# ==========================================
+# 🪟 Build e Empacotamento (Windows / PyInstaller)
+# ==========================================
+build/
+dist/
+*.spec
+
+# ==========================================
+# ⚙️ Binários e Executáveis Externos
+# Evita subir os motores do FFmpeg/yt-dlp para o repo
+# ==========================================
+*.exe
+
+# ==========================================
+# 💻 IDEs e Arquivos de Sistema
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.dblyra-repo/
