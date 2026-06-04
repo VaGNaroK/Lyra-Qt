@@ -1,0 +1,21 @@
+# Software Design Document (SDD) - Lyra-Qt
+
+## 1. Introdução
+Este documento serve como índice mestre de design do projeto Lyra-Qt. Ele unifica e padroniza a arquitetura, regras operacionais de UI/UX, e as diretrizes de código que devem guiar futuras adições de funcionalidades ao Lyra.
+
+## 2. Índice de Especificações
+Todo o projeto deve estar submetido às regras descritas na documentação vinculada abaixo. As alterações e propostas de PR (Pull Request) devem respeitar as metodologias e padrões em:
+
+- 🏛️ **Arquitetura Geral**: Ver [`docs/arquitetura.md`](../docs/arquitetura.md)
+- 📦 **Descrição dos Módulos**: Ver [`docs/modulos.md`](../docs/modulos.md)
+- 🎨 **Regras de Interface (UX/UI)**: Ver [`docs/ux-rules.md`](../docs/ux-rules.md)
+- 🏎️ **Aceleração e Hardware (GPU)**: Ver [`docs/gpu-pipeline.md`](../docs/gpu-pipeline.md)
+- 📝 **Padrões de Escrita (Coding Standards)**: Ver [`docs/coding-standards.md`](../docs/coding-standards.md)
+- 🐛 **Histórico de Regressões e Bugs Notórios**: Ver [`docs/regressions-history.md`](../docs/regressions-history.md)
+
+## 3. Estado Atual do Sistema
+O sistema encontra-se numa arquitetura PySide6 unindo múltiplas ferramentas GNU (FFmpeg, yt-dlp). 
+O SDD reforça que as implementações respeitem o paradigma `Model-View-Controller`, delegando UI para `LyraMainWindow` e processamento para `FFmpegEngine` e `YTDLPEngine`. O motor suporta desde manipulações simples (cortes, transcodificação) até pipelines complexos sem perda de qualidade, como a Extração de Legendas em lote (via processamento assíncrono e detecção de formatos textuais).
+
+## 4. Evolução
+O projeto é vivo. Adições futuras de motores (Ex: Integração com bibliotecas AI de Upscaling, ou APIs externas) devem gerar um novo arquivo de "Engine" no repositório `/core`, expondo um contrato de Slots/Signals transparente compatível com o estipulado na documentação do projeto.

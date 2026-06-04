@@ -21,7 +21,8 @@ mkdir -p $BUILD_DIR/DEBIAN
 
 echo "📦 Copiando arquivos..."
 # 🔒 done.wav é o padrão desde a v1.1.5 (QSoundEffect substituiu ffplay)
-cp main.py done.wav lyra.svg $BUILD_DIR/usr/games/lyra-app/
+cp main.py $BUILD_DIR/usr/games/lyra-app/
+cp -r assets $BUILD_DIR/usr/games/lyra-app/
 
 # 🔒 Verificação de segurança: Copia as pastas apenas se existirem (Suporte a Flat/Modular)
 if [ -d "gui" ]; then
@@ -31,7 +32,7 @@ if [ -d "core" ]; then
     cp -r core $BUILD_DIR/usr/games/lyra-app/
 fi
 
-cp lyra.svg $BUILD_DIR/usr/share/icons/hicolor/scalable/apps/
+cp assets/icons/lyra.svg $BUILD_DIR/usr/share/icons/hicolor/scalable/apps/
 
 echo "📝 Criando metadados..."
 cat << EOF > $BUILD_DIR/DEBIAN/control

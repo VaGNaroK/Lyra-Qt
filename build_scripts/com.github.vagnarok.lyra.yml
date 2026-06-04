@@ -60,7 +60,7 @@ modules:
     buildsystem: simple
     sources:
       - type: dir
-        path: .
+        path: ..
     build-commands:
       # Criação da estrutura de pastas
       - mkdir -p /app/share/lyra
@@ -69,12 +69,13 @@ modules:
       - mkdir -p /app/share/icons/hicolor/scalable/apps
       
       # Cópia inteligente e recursiva de toda a arquitetura
-      - cp main.py done.wav lyra.svg /app/share/lyra/
+      - cp main.py /app/share/lyra/
+      - cp -r assets /app/share/lyra/
       - cp -r core /app/share/lyra/
       - cp -r gui /app/share/lyra/
       
       # Atalhos e Ícones
-      - cp lyra.svg /app/share/icons/hicolor/scalable/apps/com.github.vagnarok.lyra.svg
+      - cp assets/icons/lyra.svg /app/share/icons/hicolor/scalable/apps/com.github.vagnarok.lyra.svg
       - |
         cat << EOF > /app/share/applications/com.github.vagnarok.lyra.desktop
         [Desktop Entry]

@@ -7,12 +7,24 @@ import json
 from PySide6.QtCore import QObject, Signal, QProcess
 
 class FFmpegEngine(QObject):
+    """
+    Motor central assíncrono para processamento de conversões multimídia.
+    Usa QProcess para invocar e gerenciar o binário do FFmpeg em background, 
+    parseando o progresso e o log de saída para atualizar a interface gráfica.
+    """
     progress_updated = Signal(int, int, str, str, str, str)
     log_updated = Signal(str)
     process_finished = Signal(int, int, bool)
 
-    def __init__(self):
+    def __init__(self, resource_dir=None):
+        """
+        Inicializa o motor configurando o estado das conversões e resolvendo os binários.
+        
+        Args:
+            resource_dir (str, optional): Caminho do diretório de recursos (assets).
+        """
         super().__init__()
+        self.resource_dir = resource_dir
         self.process = None
         self.conversion_start_time = 0.0
         self.current_duration = 0.0
@@ -23,16 +35,30 @@ class FFmpegEngine(QObject):
         self.current_output = ""
         self.current_options = {}
 
-        self.ffmpeg_bin = "ffmpeg"
-        self.ffprobe_bin = "ffprobe"
+        import sys
+        if sys.platform == "win32" and self.resource_dir:
+            self.ffmpeg_bin = os.path.join(self.resource_dir, "assets", "bin", "ffmpeg.exe")
+            self.ffprobe_bin = os.path.join(self.resource_dir, "assets", "bin", "ffprobe.exe")
+        else:
+            self.ffmpeg_bin = "ffmpeg"
+            self.ffprobe_bin = "ffprobe"
 
     def format_time(self, seconds):
+        """
+        Converte uma quantidade de segundos brutos para o formato legível HH:MM:SS.
+        """
         h = int(seconds // 3600)
         m = int((seconds % 3600) // 60)
         s = int(seconds % 60)
         return f"{h:02}:{m:02}:{s:02}"
 
     def get_media_duration(self, file_path):
+        """
+        Executa ffprobe para obter a duração total do arquivo multimídia em segundos.
+        
+        Returns:
+            float: Duração em segundos, ou 0.0 se falhar.
+        """
         try:
             cmd = [self.ffprobe_bin, "-v", "error", "-show_entries", "format=duration",
                    "-of", "default=noprint_wrappers=1:nokey=1", file_path]
@@ -47,6 +73,12 @@ class FFmpegEngine(QObject):
             return 0.0
             
     def get_video_resolution(self, file_path):
+        """
+        Executa ffprobe para identificar a resolução nativa do vídeo.
+        
+        Returns:
+            tuple: (largura, altura) ou (None, None) em caso de erro.
+        """
         try:
             cmd = [self.ffprobe_bin, "-v", "error", "-select_streams", "v:0",
                    "-show_entries", "stream=width,height",
@@ -64,6 +96,13 @@ class FFmpegEngine(QObject):
         return 0, 0
     
     def get_human_media_info(self, file_path):
+        """
+        Extrai metadados variados do arquivo (streams de vídeo/áudio, codec, resolução)
+        e os formata de maneira rica com emojis para exibição na interface gráfica.
+        
+        Returns:
+            str: Texto formatado detalhando as informações da mídia.
+        """
         if not os.path.exists(file_path):
             return "❌ Arquivo não encontrado."
         try:
@@ -141,6 +180,12 @@ class FFmpegEngine(QObject):
             return f"❌ Erro ao analisar mídia: {str(e)}"
     
     def get_audio_tracks(self, file_path):
+        """
+        Lista todas as faixas de áudio disponíveis dentro de um arquivo multimídia.
+        
+        Returns:
+            list: Lista contendo dicionários com 'index' e 'label' de cada faixa.
+        """
         if not os.path.exists(file_path):
             return []
         try:
@@ -162,6 +207,13 @@ class FFmpegEngine(QObject):
             return []
     
     def detect_crop(self, file_path):
+        """
+        Executa um filtro avançado (cropdetect) no FFprobe para analisar barras pretas
+        na imagem/vídeo. Retorna coordenadas exatas para cropar o arquivo.
+        
+        Returns:
+            dict: (top, bottom, left, right) em pixels para realizar o crop seguro.
+        """
         if not os.path.exists(file_path):
             return None
         orig_w, orig_h = self.get_video_resolution(file_path)
@@ -190,6 +242,9 @@ class FFmpegEngine(QObject):
         return None
 
     def parse_bitrate_to_kbps(self, value):
+        """
+        Converte strings de bitrate (ex: '2M', '500k') para valores float em kbps.
+        """
         if not value: return None
         try:
             txt = str(value).lower().strip().replace(" ", "")
@@ -202,6 +257,17 @@ class FFmpegEngine(QObject):
             return None
 
     def start_conversion(self, row, input_file, output_file, duration, options):
+        """
+        Configura e inicia a conversão de forma assíncrona. Se necessário 2 passos (ex: AV1 pass 1),
+        iniciará a Pass 1 e delegará a Pass 2 ao terminar.
+        
+        Args:
+            row (int): A linha da tabela na GUI correspondente a este arquivo.
+            input_file (str): Caminho de origem.
+            output_file (str): Caminho de destino.
+            duration (float): Duração total para cálculo de progresso.
+            options (dict): Opções de codificação geradas na interface gráfica.
+        """
         self.current_row = row
         self.current_duration = duration
         self.conversion_start_time = time.time()
@@ -235,6 +301,10 @@ class FFmpegEngine(QObject):
         self.process.start()
 
     def ffmpeg_process_finished(self, exitCode, exitStatus):
+        """
+        Gerencia o fim da execução do FFmpeg. Se for uma conversão de 2 passos,
+        inicia o Passo 2 ao finalizar o Passo 1. Caso contrário, emite sinal de conclusão para a GUI.
+        """
         if self.current_pass == 1 and exitCode == 0:
             self.current_pass = 2
             cmd = self.build_ffmpeg_command(self.current_input, self.current_output, self.current_options, pass_num=2)
@@ -249,6 +319,13 @@ class FFmpegEngine(QObject):
             self.process_finished.emit(self.current_row, exitCode, False)
 
     def build_ffmpeg_command(self, input_file, output_file, options, pass_num=0):
+        """
+        Gera a linha de comando exata para ser executada pelo binário do FFmpeg.
+        Resolve hardware acceleration, codecs, mapeamento de faixas, filtros de vídeo/áudio e afins.
+        
+        Returns:
+            list: Array contendo o binário do ffmpeg seguido por todas as flags formatadas.
+        """
         # 1. Base Configuration
         ffmpeg_bin = options.get("ffmpeg_path", "ffmpeg")
         cmd = [ffmpeg_bin, "-y", "-hide_banner"]
@@ -256,6 +333,19 @@ class FFmpegEngine(QObject):
         ext_destino = os.path.splitext(output_file)[1].lower().replace(".", "")
         is_image = ext_destino in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv"]
         is_audio_only = ext_destino in ["mp3", "ogg", "wav", "aac", "flac", "wma", "ac3", "opus", "m4a"]
+        is_subtitle_only = ext_destino in ["srt", "ass", "vtt"]
+
+        if is_subtitle_only:
+            # Configuração otimizada para extração limpa de legenda
+            sub_track = options.get("extract_sub_track", 0)
+            cmd.extend(["-i", input_file])
+            cmd.extend(["-vn", "-an"]) # Desativa vídeo e áudio
+            cmd.extend(["-map", f"0:s:{sub_track}?"]) # Seleciona a faixa específica
+            cmd.extend(["-c:s", "srt" if ext_destino == "srt" else "copy"])
+            extra = options.get("extra_args", "")
+            if extra: cmd.extend(extra.split(" "))
+            cmd.append(output_file)
+            return cmd
 
         if ext_destino == "ogg" and options.get("acodec") == "libmp3lame":
             options["acodec"] = "libvorbis"
@@ -383,7 +473,7 @@ class FFmpegEngine(QObject):
                     cmd.extend(["-preset", "p7", "-profile:v", "high", "-tune", "hq", "-rc", "vbr", "-cq", "18", "-spatial-aq", "1", "-temporal-aq", "1", "-rc-lookahead", "32", "-b_ref_mode", "2"])
 
             threads = options.get("threads", 0)
-            if threads > 0 and vcodec not in ("default", "copy"):
+            if threads > 0 and vcodec in ("libx264", "libx265"):
                 cmd.extend(["-threads:v", str(threads)])
 
             is_nvenc = "nvenc" in vcodec
@@ -451,6 +541,10 @@ class FFmpegEngine(QObject):
         return cmd
 
     def read_ffmpeg_output(self):
+        """
+        Lê nativamente os logs gerados pela saída padrão do FFmpeg (stderr), extraindo 
+        velocidade e tempo via RegEx para calcular e emitir porcentagens precisas à interface.
+        """
         if not self.process:
             return
         output = self.process.readAllStandardError().data().decode("utf-8", errors="replace")
@@ -468,5 +562,8 @@ class FFmpegEngine(QObject):
             self.progress_updated.emit(self.current_row, progress, self.format_time(elapsed_sec), self.format_time(rem_sec), size_str, f"{status_prefix}{progress}%")
 
     def stop_all(self):
+        """
+        Mata o processo em background cancelando a conversão instantaneamente.
+        """
         if self.process and self.process.state() == QProcess.Running:
             self.process.kill()

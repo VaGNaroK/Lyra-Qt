@@ -18,3 +18,13 @@ Este documento acompanha bugs e regressões resolvidos ao longo do projeto, para
 ## 4. Erro de Execução de Audio Multi-Faixas em Atualizações (Event Block)
 - **Problema**: Ao varrer metadados de novas mídias e popular a lista (`combo_audio_track.clear()`), o signal `currentIndexChanged` era disparado recursivamente acidentalmente.
 - **Fix (🔒)**: Envolvido o repopulamento com `.blockSignals(True)` e `False` logo em seguida na função `on_file_selected_for_info`.
+
+## 5. Falha ao Selecionar Diretório no Windows (QFileDialog)
+- **Problema**: No ambiente Windows, o botão de procurar diretório (tanto para "Destino da conversão" quanto para "Adicionar Pasta") estava impossibilitado de confirmar a seleção de pastas. O diálogo não-nativo do Qt operava como seletor de arquivos.
+- **Sintoma**: O usuário não conseguia configurar a pasta de destino porque o botão de confirmação ficava desativado, esperando a seleção de um arquivo.
+- **Fix (🔒)**: O parâmetro padrão `QFileDialog.ShowDirsOnly` foi sobrescrito quando passamos explicitamente `options=QFileDialog.DontUseNativeDialog`. A correção consistiu em fazer a combinação das duas flags usando um bitwise OR (`|`): `options=QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly`.
+
+## 6. Diretório de Destino Não Salvo Entre Sessões
+- **Problema**: O diretório escolhido pelo usuário para salvar os arquivos ("Destino da conversão") era redefinido para a pasta padrão do sistema (Ex: `~/Vídeos/Lyra`) toda vez que a aplicação era reiniciada.
+- **Sintoma**: O usuário tinha que reconfigurar o diretório de destino a cada nova execução do software.
+- **Fix (🔒)**: Implementação da classe `QSettings("Lyra", "Lyra-Qt")` para persistir o caminho e recuperá-lo no método de inicialização da UI de forma automática.

@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+# pyrefly: ignore [missing-import]
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolBar,
     QStackedWidget, QTableWidget, QTableWidgetItem, QHeaderView, QLabel,
@@ -9,8 +10,8 @@ from PySide6.QtWidgets import (
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
     QStyle, QApplication, QInputDialog
 )
-from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen
-from PySide6.QtCore import Qt, QSize, QUrl
+from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices
+from PySide6.QtCore import Qt, QSize, QUrl, QSettings
 from PySide6.QtMultimedia import QSoundEffect
 
 # ==============================================================================
@@ -28,17 +29,21 @@ except ImportError:
     from utils import normalize_bitrate
 
 class LyraMainWindow(QMainWindow):
+    """
+    Classe principal da Interface Gráfica (GUI) do Lyra Multimedia Converter.
+    Gerencia todas as abas, layouts, interações do usuário e delega as tarefas pesadas
+    aos motores assíncronos (FFmpegEngine e YTDLPEngine).
+    """
     def __init__(self, version, resource_dir=None):
         super().__init__()
+        self.settings = QSettings("Lyra", "Lyra-Qt")
         self.setWindowTitle(f"Lyra Multimedia Converter v{version}")
         self.resize(1024, 650)
         self.setMinimumSize(850, 550)
 
-        if resource_dir is None:
-            resource_dir = os.path.dirname(os.path.abspath(__file__))
-        self.resource_dir = resource_dir
-
-        icon_path = os.path.join(self.resource_dir, "lyra.svg")
+        self.version = version
+        self.resource_dir = resource_dir or os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(self.resource_dir, "assets", "icons", "lyra.svg")
         self.app_icon = (
             QIcon(icon_path) if os.path.exists(icon_path)
             else self.style().standardIcon(QStyle.SP_ComputerIcon)
@@ -52,11 +57,7 @@ class LyraMainWindow(QMainWindow):
         # ======================================================================
         # ⚙️ INICIALIZAÇÃO DOS MOTORES (CORE)
         # ======================================================================
-        self.engine = FFmpegEngine()
-        if sys.platform == "win32":
-            self.engine.ffmpeg_bin = os.path.join(self.resource_dir, "ffmpeg.exe")
-            self.engine.ffprobe_bin = os.path.join(self.resource_dir, "ffprobe.exe")
-
+        self.engine = FFmpegEngine(self.resource_dir)
         self.engine.progress_updated.connect(self.update_progress_ui)
         self.engine.log_updated.connect(self.update_log_ui)
         self.engine.process_finished.connect(self.on_ffmpeg_finished)
@@ -71,7 +72,7 @@ class LyraMainWindow(QMainWindow):
         self.ytdlp_engine.error_occurred.connect(self.on_dl_error)
 
         self.done_sound = QSoundEffect(self)
-        sound_path = os.path.join(self.resource_dir, "done.wav")
+        sound_path = os.path.join(self.resource_dir, "assets", "sounds", "done.wav")
         if os.path.exists(sound_path):
             self.done_sound.setSource(QUrl.fromLocalFile(os.path.abspath(sound_path)))
             self.done_sound.setVolume(0.7)
@@ -84,6 +85,9 @@ class LyraMainWindow(QMainWindow):
         self.load_presets()
 
     def center_on_screen(self):
+        """
+        Centraliza a janela do aplicativo perfeitamente no meio do monitor principal do usuário.
+        """
         screen = QApplication.primaryScreen()
         if screen:
             screen_geometry = screen.geometry()
@@ -92,6 +96,9 @@ class LyraMainWindow(QMainWindow):
             self.move(x, y)
 
     def _play_done_sound(self):
+        """
+        Toca o arquivo de áudio (done.wav) para alertar o usuário que a conversão foi finalizada.
+        """
         if self.done_sound is not None:
             try:
                 self.done_sound.play()
@@ -99,6 +106,9 @@ class LyraMainWindow(QMainWindow):
                 pass
 
     def setup_tray(self):
+        """
+        Configura o ícone na bandeja do sistema (System Tray) para notificações silenciosas.
+        """
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self.tray_icon = None
             self.tray_available = False
@@ -150,6 +160,10 @@ class LyraMainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
+        """
+        Intercepta o fechamento da janela. Se houver downloads ou conversões ocorrendo,
+        pergunta ao usuário se ele realmente quer abortar tudo.
+        """
         if self.tray_available:
             event.ignore()
             self.hide()
@@ -160,7 +174,20 @@ class LyraMainWindow(QMainWindow):
                     QSystemTrayIcon.Information, 3000
                 )
         else:
-            event.accept()
+            if self.is_converting or self.is_downloading:
+                resposta = QMessageBox.question(
+                    self, "Aviso",
+                    "Há uma tarefa em andamento. Deseja forçar o encerramento?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if resposta == QMessageBox.Yes:
+                    self.engine.stop_all()
+                    self.ytdlp_engine.stop()
+                    event.accept()
+                else:
+                    event.ignore()
+            else:
+                event.accept()
 
     def force_quit(self):
         if self.is_converting or self.is_downloading:
@@ -177,6 +204,10 @@ class LyraMainWindow(QMainWindow):
             QApplication.instance().quit()
 
     def setup_ui(self):
+        """
+        Ponto de entrada central para construção de toda a interface do aplicativo.
+        Configura os painéis (Main, Advanced, Download) e a barra lateral de navegação.
+        """
         self.toolbar = QToolBar("Ferramentas Principais")
         self.toolbar.setMovable(False)
         self.addToolBar(Qt.TopToolBarArea, self.toolbar)
@@ -229,13 +260,16 @@ class LyraMainWindow(QMainWindow):
         self.action_download.triggered.connect(lambda: self.switch_page(2 if self.stacked_widget.currentIndex() != 2 else 0))
 
     def create_main_page(self):
+        """
+        Constrói a tela principal onde fica a Tabela de Arquivos e o painel de Destino.
+        """
         self.main_page = QWidget()
         main_layout = QVBoxLayout(self.main_page)
         main_layout.setContentsMargins(8, 8, 8, 8)
 
         format_layout = QHBoxLayout()
         self.combo_format = QComboBox()
-        self.combo_format.addItems(["MP4", "MKV", "AVI", "MP3", "OGG", "WAV", "JPG", "PNG", "GIF", "BMP", "WEBP"])
+        self.combo_format.addItems(["MP4", "MKV", "AVI", "MP3", "OGG", "WAV", "JPG", "PNG", "GIF", "BMP", "WEBP", "SRT"])
         self.combo_format.setMinimumWidth(150)
         format_layout.addWidget(QLabel("🎬 Formato:"))
         format_layout.addWidget(self.combo_format)
@@ -279,21 +313,34 @@ class LyraMainWindow(QMainWindow):
         self.combo_exist_action = QComboBox()
         self.combo_exist_action.addItems(["Sobrescrever", "Escolher outro nome", "Pular conversão"])
         default_dest = os.path.join(os.path.expanduser("~"), "Vídeos", "Lyra")
-        os.makedirs(default_dest, exist_ok=True)
-        self.lbl_dest_path = QLabel(default_dest)
+        saved_dest = self.settings.value("last_destination", default_dest)
+        if not os.path.exists(saved_dest):
+            try:
+                os.makedirs(saved_dest, exist_ok=True)
+            except Exception:
+                saved_dest = default_dest
+                os.makedirs(saved_dest, exist_ok=True)
+        self.lbl_dest_path = QLabel(saved_dest)
         self.lbl_dest_path.setFrameStyle(QFrame.Panel | QFrame.Sunken)
         self.lbl_dest_path.setMinimumWidth(300)
         self.btn_browse_dest = QPushButton("🔍 Procurar...")
         self.btn_browse_dest.clicked.connect(self.browse_destination)
+        self.btn_open_dest = QPushButton("📂 Abrir Pasta")
+        self.btn_open_dest.clicked.connect(self.open_destination_folder)
         dest_layout.addWidget(QLabel("📂 Destino:"))
         dest_layout.addWidget(self.combo_exist_action)
         dest_layout.addWidget(self.lbl_dest_path)
         dest_layout.addWidget(self.btn_browse_dest)
+        dest_layout.addWidget(self.btn_open_dest)
         dest_layout.addStretch()
         main_layout.addLayout(dest_layout)
         self.stacked_widget.addWidget(self.main_page)
 
     def create_advanced_page(self):
+        """
+        Constrói a tela de "Opções Avançadas", agrupando todas as abas de codificação:
+        Áudio, Vídeo, Imagem, Legenda, Filtros e Mais.
+        """
         self.advanced_page = QWidget()
         advanced_layout = QVBoxLayout(self.advanced_page)
         self.tab_widget = QTabWidget()
@@ -309,6 +356,9 @@ class LyraMainWindow(QMainWindow):
         self.stacked_widget.addWidget(self.advanced_page)
 
     def create_download_page(self):
+        """
+        Constrói a tela de "Baixar da Web", injetando o painel de URL e opções de qualidade do yt-dlp.
+        """
         self.download_page = QWidget()
         layout = QVBoxLayout(self.download_page)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -575,6 +625,18 @@ class LyraMainWindow(QMainWindow):
 
         layout.addWidget(group_file)
         layout.addWidget(group_mode)
+
+        group_extract = QGroupBox("📤 Extração de Legenda (MKV, MP4)")
+        group_extract.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
+        extract_layout = QFormLayout(group_extract)
+        self.combo_sub_extract_track = QComboBox()
+        self.combo_sub_extract_track.addItems(["Faixa 1 (Padrão)", "Faixa 2", "Faixa 3", "Faixa 4"])
+        extract_layout.addRow("🎯 Extrair Faixa:", self.combo_sub_extract_track)
+        extract_note = QLabel("<i>Nota: Para extrair, selecione 'SRT' como formato na aba principal.<br>Legendas de imagem (PGS) não são suportadas sem OCR.</i>")
+        extract_note.setStyleSheet("color: gray;")
+        extract_layout.addRow(extract_note)
+        layout.addWidget(group_extract)
+
         layout.addStretch()
         self.tab_widget.addTab(tab, "📝 Legendas")
 
@@ -725,6 +787,7 @@ class LyraMainWindow(QMainWindow):
         threads_layout.addWidget(self.lbl_threads_val)
 
         self.entry_extra_args = QLineEdit()
+        self.entry_extra_args.setPlaceholderText("Ex: -preset ultrafast -tune animation")
         self.entry_ffmpeg_path = QLineEdit("ffmpeg")
 
         layout.addRow("🧠 Threads do Processador:", threads_layout)
@@ -790,16 +853,23 @@ class LyraMainWindow(QMainWindow):
         self.frame_dl_video.setVisible(not is_audio)
         self.frame_dl_audio.setVisible(is_audio)
 
+    def open_destination_folder(self):
+        path = self.lbl_dest_path.text()
+        if os.path.exists(path):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
     def browse_destination(self):
-        path = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Destino", self.lbl_dest_path.text(), options=QFileDialog.DontUseNativeDialog)
-        if path: self.lbl_dest_path.setText(path)
+        path = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Destino", self.lbl_dest_path.text(), options=QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly)
+        if path: 
+            self.lbl_dest_path.setText(path)
+            self.settings.setValue("last_destination", path)
 
     def add_files_dialog(self):
         paths, _ = QFileDialog.getOpenFileNames(self, "Adicionar Arquivos", os.path.expanduser("~"), options=QFileDialog.DontUseNativeDialog)
         for path in paths: self.add_file_to_table(path)
 
     def add_folder_dialog(self):
-        path = QFileDialog.getExistingDirectory(self, "Adicionar Pasta", os.path.expanduser("~"), options=QFileDialog.DontUseNativeDialog)
+        path = QFileDialog.getExistingDirectory(self, "Adicionar Pasta", os.path.expanduser("~"), options=QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly)
         if path:
             for root, _, files in os.walk(path):
                 for f in files: self.add_file_to_table(os.path.join(root, f))
@@ -858,6 +928,7 @@ class LyraMainWindow(QMainWindow):
             "img_quality": self.slider_img_quality.value(),
             "sub_path": self.entry_sub_path.text().strip(),
             "sub_mode": self.combo_sub_mode.currentIndex(),
+            "extract_sub_track": self.combo_sub_extract_track.currentIndex(),
             "rotate": self.combo_rotate.currentText(),
             "deinterlace": self.chk_deinterlace.isChecked(),
             "fade_dur": self.spin_fade_duration.value(),

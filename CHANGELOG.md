@@ -2,12 +2,14 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
-## [1.1.7] - 2026-06-01
+## [1.1.8] - 2026-06-03
 
 ### Adicionado
+* **Extração Nativa de Legendas (Softsubs):** Adicionado suporte à extração cirúrgica de legendas de arquivos MKV/MP4 para arquivos `.srt` isolados sem perda de qualidade, suportando mapeamento de faixas e conversões em lote com alta velocidade (Copy Stream).
+
 * **Redução de Ruído via Rede Neural (RNNoise):** Inserida integração nativa com o modelo `cb.rnnn` para limpeza avançada de ruído de fundo, incluindo mecanismo de fallback seguro que força a recodificação (`aac`) caso o usuário esqueça o codec na opção "copy".
 
-## [1.1.6] - 2026-05-31
+## [1.1.7] - 2026-06-01
 
 ### Adicionado
 * **Inspetor de Mídia Inteligente:** Nova aba "Info da Mídia" que exibe os metadados estruturados (Codec, Resolução, Canais, Bitrate, Idioma) utilizando o `ffprobe` com formatação JSON nativa.
