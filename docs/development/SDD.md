@@ -15,7 +15,7 @@ Todo o projeto deve estar submetido às regras descritas na documentação vincu
 
 ## 3. Estado Atual do Sistema
 O sistema encontra-se numa arquitetura PySide6 unindo múltiplas ferramentas GNU (FFmpeg, yt-dlp). 
-O SDD reforça que as implementações respeitem o paradigma `Model-View-Controller`, delegando UI para `LyraMainWindow` e processamento para `FFmpegEngine` e `YTDLPEngine`. O motor suporta desde manipulações simples (cortes, transcodificação) até pipelines complexos sem perda de qualidade, como a Extração de Legendas em lote (via processamento assíncrono e detecção de formatos textuais). Dependências externas mutáveis (como `yt-dlp`) devem ser estritamente gerenciadas dentro do ambiente virtual (`venv`) e rastreadas via `requirements.txt` para evitar degradação frente a atualizações de APIs web.
+O SDD reforça que as implementações respeitem o paradigma `Model-View-Controller`, delegando UI para `LyraMainWindow` e processamento para `FFmpegEngine` e `YTDLPEngine`. O motor FFmpeg foi projetado para operações MUX não-destrutivas (preservando legendas originais nativamente) usando a flag de mapeamento acumulativo seletivo (`-map 0:v:0`, `-map 0:s?`), suportando múltiplas injeções de faixas sem perdas estruturais ou bugs com imagens de capa. Dependências externas mutáveis (como `yt-dlp`) devem ser estritamente gerenciadas dentro do ambiente virtual (`venv`) e rastreadas via `requirements.txt`.
 
 ## 4. Evolução
 O projeto é vivo. Adições futuras de motores (Ex: Integração com bibliotecas AI de Upscaling, ou APIs externas) devem gerar um novo arquivo de "Engine" no repositório `/core`, expondo um contrato de Slots/Signals transparente compatível com o estipulado na documentação do projeto.

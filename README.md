@@ -15,7 +15,7 @@ O **Lyra Multimedia Converter** é uma interface gráfica (GUI) moderna, modular
 * ✂️ **Auto-Crop Mágico:** Detecção automática de bordas pretas (Letterbox) e preenchimento matemático dos parâmetros de corte.
 * 🎛️ **Áudio de Cinema (DRC):** Downmix inteligente de 5.1/7.1 para Estéreo com normalização dinâmica (`dynaudnorm`), nivelando efeitos sonoros e vozes.
 * 🌐 **Download da Web Integrado:** Motor do yt-dlp embutido para baixar vídeos e áudios com seleção cirúrgica de resolução e formato.
-* 📝 **Gestão de Legendas e Faixas:** Extração avançada de faixas de áudio específicas e suporte a legendas embutidas (Softsub) ou queimadas no vídeo (Hardsub).
+* 📝 **Multiplexação Avançada (MUX):** Injeção de múltiplas trilhas de áudios externos e dezenas de legendas (Softsub) de forma acumulativa, sem perder as faixas originais do contêiner nativo (MKV/MP4).
 * 💾 **Sistema de Presets:** Salve, carregue e gerencie as suas configurações favoritas de renderização com um clique.
 * ⚡ **Arquitetura Assíncrona:** Interface 100% responsiva (não congela) com feedback visual detalhado sobre o progresso, tempo restante e logs em tempo real.
 

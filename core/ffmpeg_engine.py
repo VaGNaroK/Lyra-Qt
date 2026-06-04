@@ -128,6 +128,9 @@ class FFmpegEngine(QObject):
             size_mb = int(format_info.get("size", 0)) / (1024 * 1024)
             out.append(f"Tamanho: {size_mb:.2f} MB")
             
+            fmt_name = format_info.get("format_name", "Desconhecido").split(",")[0]
+            out.append(f"Formato: {fmt_name}")
+            
             if not is_image:
                 duration = float(format_info.get("duration", 0))
                 out.append(f"Duração: {self.format_time(duration)}")
@@ -158,9 +161,25 @@ class FFmpegEngine(QObject):
                                 if den != "0":
                                     fps = float(num)/float(den)
                                     out.append(f"Framerate: {fps:.2f} FPS")
+                        
+                        bit_rate = stream.get("bit_rate") or stream.get("max_bit_rate")
+                        if not bit_rate:
+                            tags = stream.get("tags", {})
+                            bps_keys = [k for k in tags.keys() if "BPS" in k.upper()]
+                            if bps_keys:
+                                bit_rate = tags[bps_keys[0]]
+
+                        if bit_rate and str(bit_rate).isdigit():
+                            br_mbps = int(bit_rate) / 1000000
+                            out.append(f"Maximum bit rate: {br_mbps:.1f} Mb/s")
+                            
+                        dar = stream.get("display_aspect_ratio")
+                        if dar:
+                            out.append(f"Proporção tela: {dar}")
                     
                 elif codec_type == "AUDIO":
                     out.append(f"🎵 ÁUDIO (Faixa {i})")
+                    out.append(f"Formato: {codec_name.lower()}")
                     out.append(f"Codec: {codec_name}")
                     out.append(f"Canais: {stream.get('channels', '?')}")
                     out.append(f"Frequência: {stream.get('sample_rate', '?')} Hz")
@@ -362,30 +381,58 @@ class FFmpegEngine(QObject):
         vf_filters = []
         af_filters = []
 
-        sub_path = options.get("sub_path", "")
+        sub_paths = options.get("sub_paths", [])
+        audio_paths = options.get("audio_paths", [])
         sub_mode = options.get("sub_mode", 0)
-        has_softsub = False
+        
+        valid_audios = [p for p in audio_paths if os.path.isfile(p)]
+        valid_subs = [p for p in sub_paths if os.path.isfile(p)]
+        
+        softsubs_added = 0
 
-        if sub_path and os.path.isfile(sub_path) and not is_image and not is_audio_only:
-            if sub_mode == 0:
-                cmd.extend(["-i", sub_path])
-                has_softsub = True
-            elif sub_mode == 1:
-                escaped_sub = (sub_path.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'"))
+        if not is_image and not is_audio_only:
+            # Inject external audios
+            for audio in valid_audios:
+                cmd.extend(["-i", audio])
+            
+            # Inject external subs
+            if sub_mode == 0: # Softsub
+                for sub in valid_subs:
+                    cmd.extend(["-i", sub])
+                    softsubs_added += 1
+            elif sub_mode == 1 and valid_subs: # Hardsub
+                escaped_sub = (valid_subs[0].replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'"))
                 vf_filters.append(f"subtitles='{escaped_sub}'")
 
-        # 3. Audio Tracks & Mapping
+        # 3. Mapeamento (-map)
         audio_track = options.get("audio_track", -1)
+        
+        # 3.1. Vídeo Principal (Sempre o vídeo principal, ignorando capas/attached_pics)
+        if not is_audio_only:
+            cmd.extend(["-map", "0:v:0?"])
+            
+        # 3.2. Áudio Original
         if options.get("all_tracks"):
-            cmd.extend(["-map", "0"])
-            if has_softsub: cmd.extend(["-map", "1:0"])
-        elif audio_track != -1 or has_softsub:
-            if not is_audio_only: cmd.extend(["-map", "0:v:0"])
-            a_idx = audio_track if audio_track != -1 else 0
-            cmd.extend(["-map", f"0:a:{a_idx}?"])
-            if has_softsub: cmd.extend(["-map", "1:0"])
+            cmd.extend(["-map", "0:a?"])
+        elif audio_track != -1:
+            cmd.extend(["-map", f"0:a:{audio_track}?"])
+        else:
+            cmd.extend(["-map", "0:a:0?"])
+            
+        # 3.3. Legendas Originais
+        if not is_audio_only and not is_image:
+            cmd.extend(["-map", "0:s?"]) # Preserva sempre as legendas originais
 
-        if has_softsub:
+        # 3.4. Áudios Externos mapeados sequencialmente
+        for i in range(len(valid_audios)):
+            cmd.extend(["-map", f"{1 + i}:a:0?"])
+            
+        # 3.5. Legendas Externas mapeadas sequencialmente
+        if softsubs_added > 0:
+            start_sub_idx = 1 + len(valid_audios)
+            for i in range(softsubs_added):
+                cmd.extend(["-map", f"{start_sub_idx + i}:0?"])
+            
             cmd.extend(["-c:s", "mov_text" if ext_destino == "mp4" else "srt"])
 
         # 4. Audio Filters

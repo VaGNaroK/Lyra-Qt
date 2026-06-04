@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QComboBox, QFrame, QAbstractItemView, QFileDialog, QTabWidget,
     QFormLayout, QCheckBox, QSlider, QSpinBox, QLineEdit, QGroupBox,
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
-    QStyle, QApplication, QInputDialog
+    QStyle, QApplication, QInputDialog, QListWidget
 )
 from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices
 from PySide6.QtCore import Qt, QSize, QUrl, QSettings
@@ -480,6 +480,29 @@ class LyraMainWindow(QMainWindow):
         layout.addRow("", self.chk_audio_drc)
         layout.addRow("", self.chk_noise_reduction)
         layout.addRow("🔊 Volume do Áudio:", vol_layout)
+
+        group_external_audio = QGroupBox("🎵 Áudios Externos")
+        group_external_audio.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
+        ext_audio_layout = QVBoxLayout(group_external_audio)
+        self.list_external_audios = QListWidget()
+        self.list_external_audios.setFixedHeight(60)
+        
+        btn_ext_audio_layout = QHBoxLayout()
+        btn_add_audio = QPushButton("➕ Adicionar")
+        btn_add_audio.clicked.connect(self.browse_audio)
+        btn_rem_audio = QPushButton("➖ Remover")
+        btn_rem_audio.clicked.connect(lambda: self.list_external_audios.takeItem(self.list_external_audios.currentRow()))
+        btn_clear_audio = QPushButton("🧹 Limpar")
+        btn_clear_audio.clicked.connect(self.list_external_audios.clear)
+        
+        btn_ext_audio_layout.addWidget(btn_add_audio)
+        btn_ext_audio_layout.addWidget(btn_rem_audio)
+        btn_ext_audio_layout.addWidget(btn_clear_audio)
+        
+        ext_audio_layout.addWidget(self.list_external_audios)
+        ext_audio_layout.addLayout(btn_ext_audio_layout)
+        
+        layout.addRow(group_external_audio)
         
         # 🔒 AQUI ESTAVA O PROBLEMA: A linha abaixo tinha desaparecido do seu código!
         self.tab_widget.addTab(tab, "🎵 Áudio")
@@ -605,16 +628,24 @@ class LyraMainWindow(QMainWindow):
         group_file.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         group_file.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
 
-        file_layout = QHBoxLayout(group_file)
-        self.entry_sub_path = QLineEdit()
-        self.entry_sub_path.setReadOnly(True)
-        self.btn_browse_sub = QPushButton("🔍 Procurar...")
-        self.btn_browse_sub.clicked.connect(self.browse_subtitle)
-        self.btn_clear_sub = QPushButton("❌")
-        self.btn_clear_sub.clicked.connect(self.entry_sub_path.clear)
-        file_layout.addWidget(self.entry_sub_path)
-        file_layout.addWidget(self.btn_browse_sub)
-        file_layout.addWidget(self.btn_clear_sub)
+        file_layout = QVBoxLayout(group_file)
+        self.list_external_subs = QListWidget()
+        self.list_external_subs.setFixedHeight(60)
+        
+        btn_ext_sub_layout = QHBoxLayout()
+        btn_add_sub = QPushButton("➕ Adicionar")
+        btn_add_sub.clicked.connect(self.browse_subtitle)
+        btn_rem_sub = QPushButton("➖ Remover")
+        btn_rem_sub.clicked.connect(lambda: self.list_external_subs.takeItem(self.list_external_subs.currentRow()))
+        btn_clear_sub = QPushButton("🧹 Limpar")
+        btn_clear_sub.clicked.connect(self.list_external_subs.clear)
+        
+        btn_ext_sub_layout.addWidget(btn_add_sub)
+        btn_ext_sub_layout.addWidget(btn_rem_sub)
+        btn_ext_sub_layout.addWidget(btn_clear_sub)
+        
+        file_layout.addWidget(self.list_external_subs)
+        file_layout.addLayout(btn_ext_sub_layout)
 
         group_mode = QGroupBox("⚙️ Modo de Aplicação")
         group_mode.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
@@ -641,13 +672,24 @@ class LyraMainWindow(QMainWindow):
         self.tab_widget.addTab(tab, "📝 Legendas")
 
     def browse_subtitle(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Selecionar Legenda", os.path.expanduser("~"),
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Selecionar Legendas", os.path.expanduser("~"),
             "Arquivos de Legenda (*.srt *.ass *.vtt);;Todos os Arquivos (*.*)",
             options=QFileDialog.DontUseNativeDialog
         )
-        if path:
-            self.entry_sub_path.setText(path)
+        if paths:
+            for path in paths:
+                self.list_external_subs.addItem(path)
+
+    def browse_audio(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Selecionar Áudios", os.path.expanduser("~"),
+            "Arquivos de Áudio (*.mp3 *.wav *.aac *.flac *.ogg *.m4a);;Todos os Arquivos (*.*)",
+            options=QFileDialog.DontUseNativeDialog
+        )
+        if paths:
+            for path in paths:
+                self.list_external_audios.addItem(path)
 
     def create_filters_tab(self):
         tab = QWidget()
@@ -926,7 +968,8 @@ class LyraMainWindow(QMainWindow):
             "two_pass": self.chk_2pass.isChecked(),
             "img_size": self.combo_img_size.currentText(),
             "img_quality": self.slider_img_quality.value(),
-            "sub_path": self.entry_sub_path.text().strip(),
+            "sub_paths": [self.list_external_subs.item(i).text() for i in range(self.list_external_subs.count())],
+            "audio_paths": [self.list_external_audios.item(i).text() for i in range(self.list_external_audios.count())],
             "sub_mode": self.combo_sub_mode.currentIndex(),
             "extract_sub_track": self.combo_sub_extract_track.currentIndex(),
             "rotate": self.combo_rotate.currentText(),
