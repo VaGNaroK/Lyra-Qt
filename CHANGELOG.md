@@ -9,6 +9,9 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 
 * **Redução de Ruído via Rede Neural (RNNoise):** Inserida integração nativa com o modelo `cb.rnnn` para limpeza avançada de ruído de fundo, incluindo mecanismo de fallback seguro que força a recodificação (`aac`) caso o usuário esqueça o codec na opção "copy".
 
+### Corrigido
+* **Atualização Crítica do Motor yt-dlp (HTTP 403 / Precondition Check Failed):** Resolvido o problema de barreira do YouTube que proibia downloads atualizando o `yt-dlp` para a mais recente versão e isolando a dependência do sistema operacional (`venv/requirements.txt`), garantindo que a aplicação execute com as assinaturas atualizadas (nsig).
+
 ## [1.1.7] - 2026-06-01
 
 ### Adicionado
