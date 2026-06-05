@@ -39,4 +39,5 @@ dist/
 .vscode/
 .idea/
 .DS_Store
-Thumbs.dblyra-repo/
+Thumbs.db
+lyra-repo/
