@@ -1,3 +1,6 @@
+# Garante que o script está rodando na raiz do projeto (um nível acima de build_scripts)
+Set-Location -Path "$PSScriptRoot\.."
+
 Write-Host "[*] Preparando ambiente para compilar Lyra-Qt no Windows..." -ForegroundColor Cyan
 
 # 1. Criar Ambiente Virtual

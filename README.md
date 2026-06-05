@@ -112,18 +112,17 @@ flatpak install flathub org.kde.Platform/x86_64/6.7
 
 ### 🪟 Windows: Executável Autônomo (PyInstaller)
 
-O script `build_windows.ps1` orquestra o PyInstaller para compilar o código e injetar os recursos visuais nativos na aplicação.
+O script `build_scripts/build_windows.ps1` orquestra o PyInstaller para compilar o código, além de baixar as dependências automaticamente (FFmpeg e yt-dlp) e injetar os recursos visuais nativos na aplicação.
 
 **Como compilar:**
-1. Baixe os executáveis binários do `ffmpeg.exe`, `ffprobe.exe` e `yt-dlp.exe` para Windows e coloque-os na raiz da pasta do projeto.
-2. Abra o **PowerShell** como Administrador (ou libere a execução de scripts na sessão atual) rodando:
+1. Abra o **PowerShell** como Administrador (ou libere a execução de scripts na sessão atual) rodando:
    ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force
-
-Execute o script de compilação:
-
-.\build_windows.ps1
-
+   Set-ExecutionPolicy Bypass -Scope Process -Force
+   ```
+2. Execute o script de compilação a partir da raiz do projeto:
+   ```powershell
+   .\build_scripts\build_windows.ps1
+   ```
 
 **Como instalar (Uso):**
 
