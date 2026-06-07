@@ -2,7 +2,7 @@ import os
 import locale
 import mpv
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 
 class MPVPlayerWidget(QWidget):
     def __init__(self, parent=None):
@@ -10,27 +10,37 @@ class MPVPlayerWidget(QWidget):
         self.setAttribute(Qt.WA_DontCreateNativeAncestors)
         self.setAttribute(Qt.WA_NativeWindow)
         
-        # mpv is sometimes picky about locales
+        # O MPV exige isso em algumas distribuições
         locale.setlocale(locale.LC_NUMERIC, 'C')
         
+        self.mpv = None
+        
+        # Dá 100ms para o Qt criar a janela nativa no compositor (Wayland/X11) e gerar um winId válido
+        QTimer.singleShot(100, self.init_mpv)
+        
+    def init_mpv(self):
         import sys
+        
         mpv_opts = {
             'wid': str(int(self.winId())),
             'log_handler': print,
             'loglevel': 'error',
-            'input_default_bindings': True,
-            'input_vo_keyboard': True
+            'input_default_bindings': False, # Impede roubo de atalhos do Qt
+            'input_vo_keyboard': False,
+            'keep_open': 'yes'
         }
         
-        # Em Linux/Flatpak, forçamos o uso do GPU genérico para negociar com Wayland/X11
         if sys.platform.startswith('linux'):
             mpv_opts['vo'] = 'gpu'
+            mpv_opts['gpu_api'] = 'opengl'
             mpv_opts['gpu_context'] = 'auto'
-            # Impede o erro crítico de 'VT_GETMODE failed' e 'ModeSetting atomic request'
+            mpv_opts['force_window'] = 'no' # Impede de forçar janelas fantasma
             mpv_opts['terminal'] = 'no'
-
-        # Inicializa o player MPV
-        self.mpv = mpv.MPV(**mpv_opts)
+            
+        try:
+            self.mpv = mpv.MPV(**mpv_opts)
+        except Exception as e:
+            print(f"CRITICAL ERROR IN MPV INITIALIZATION: {e}")
                            
     def play(self, filepath):
         if os.path.exists(filepath):
