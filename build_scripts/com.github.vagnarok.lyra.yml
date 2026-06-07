@@ -65,7 +65,17 @@ modules:
         sha256: d653be97198a0543c69111122173c41a99e0b91426f9e17f06a858982c2fb03d
 
   # ----------------------------------------------------------------------------
-  # Modulo 2.6: libmpv (Motor de Áudio/Vídeo e Filtros LAVFI)
+  # Modulo 2.6: libXpresent (Dependência do MPV para X11 Rendering)
+  # ----------------------------------------------------------------------------
+  - name: libXpresent
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://xorg.freedesktop.org/releases/individual/lib/libXpresent-1.0.1.tar.gz
+        sha256: 8ebf8567a8f6afe5a64275a2ecfd4c84e957970c27299d964350f60be9f3541d
+
+  # ----------------------------------------------------------------------------
+  # Modulo 2.7: libmpv (Motor de Áudio/Vídeo e Filtros LAVFI)
   # ----------------------------------------------------------------------------
   - name: libmpv
     buildsystem: meson
