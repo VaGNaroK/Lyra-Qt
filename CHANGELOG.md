@@ -7,6 +7,9 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 ### Adicionado
 * **Preview de Filtros de Áudio ao Vivo (Real-Time MPV):** O player de sincronia nativo foi interligado ao painel de configurações de áudio avançadas. Agora é possível escutar em tempo real o efeito do Slider de Volume Linear (0 a 400%), do filtro Inteligente de Normalização de Vozes (DRC / Downmix) e da Redução de Ruído por IA (`cb.rnnn`). As alterações visuais na UI enviam atualizações instantâneas ao motor de áudio `libavfilter` que processa o player, sem a necessidade de recarregar a mídia.
 
+### Corrigido
+* **Renderização do MPV no Sandbox Flatpak:** Corrigido o erro crítico de falha de contexto de GPU (`VT_GETMODE` e Permissão Negada em KMS/DRM) que incapacitava a execução do player na aba "Sincronia". Foram ativados no `libmpv` empacotado os sinalizadores explícitos de `gl`, `egl`, `x11` e `wayland`, juntamente com a injeção da biblioteca vital `libXpresent`. No lado da interface, o ciclo de vida do Qt foi resguardado com a inicialização atrasada da aba (`QTimer`) para geração de `winId` válido, além de travas ativas contra roubo de terminal TTY.
+
 ## [1.1.9] - 2026-06-04
 
 ### Adicionado
