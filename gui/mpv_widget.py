@@ -22,10 +22,12 @@ class MPVPlayerWidget(QWidget):
             'input_vo_keyboard': True
         }
         
-        # Em Linux/Flatpak, o MPV pode se confundir com as camadas Wayland/DRM.
-        # Forçamos o uso do X11, que funciona perfeitamente com QT_QPA_PLATFORM=xcb
+        # Em Linux/Flatpak, forçamos o uso do GPU genérico para negociar com Wayland/X11
         if sys.platform.startswith('linux'):
-            mpv_opts['vo'] = 'x11'
+            mpv_opts['vo'] = 'gpu'
+            mpv_opts['gpu_context'] = 'auto'
+            # Desativa DRM direto que causa erro de permissão no Sandbox
+            mpv_opts['drm_mode'] = 'auto'
 
         # Inicializa o player MPV
         self.mpv = mpv.MPV(**mpv_opts)
