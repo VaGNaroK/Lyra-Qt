@@ -26,6 +26,8 @@ class MPVPlayerWidget(QWidget):
         if sys.platform.startswith('linux'):
             mpv_opts['vo'] = 'gpu'
             mpv_opts['gpu_context'] = 'auto'
+            # Impede o erro crítico de 'VT_GETMODE failed' e 'ModeSetting atomic request'
+            mpv_opts['terminal'] = 'no'
 
         # Inicializa o player MPV
         self.mpv = mpv.MPV(**mpv_opts)
