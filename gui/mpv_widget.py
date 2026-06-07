@@ -13,12 +13,22 @@ class MPVPlayerWidget(QWidget):
         # mpv is sometimes picky about locales
         locale.setlocale(locale.LC_NUMERIC, 'C')
         
-        # Inicializa o player MPV com wid associado à janela PySide6
-        self.mpv = mpv.MPV(wid=str(int(self.winId())),
-                           log_handler=print,
-                           loglevel='error',
-                           input_default_bindings=True,
-                           input_vo_keyboard=True)
+        import sys
+        mpv_opts = {
+            'wid': str(int(self.winId())),
+            'log_handler': print,
+            'loglevel': 'error',
+            'input_default_bindings': True,
+            'input_vo_keyboard': True
+        }
+        
+        # Em Linux/Flatpak, o MPV pode se confundir com as camadas Wayland/DRM.
+        # Forçamos o uso do X11, que funciona perfeitamente com QT_QPA_PLATFORM=xcb
+        if sys.platform.startswith('linux'):
+            mpv_opts['vo'] = 'x11'
+
+        # Inicializa o player MPV
+        self.mpv = mpv.MPV(**mpv_opts)
                            
     def play(self, filepath):
         if os.path.exists(filepath):
