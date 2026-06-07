@@ -22,6 +22,7 @@ mkdir -p $BUILD_DIR/DEBIAN
 echo "📦 Copiando arquivos..."
 # 🔒 done.wav é o padrão desde a v1.1.5 (QSoundEffect substituiu ffplay)
 cp main.py $BUILD_DIR/usr/games/lyra-app/
+cp requirements.txt $BUILD_DIR/usr/games/lyra-app/
 cp -r assets $BUILD_DIR/usr/games/lyra-app/
 
 # 🔒 Verificação de segurança: Copia as pastas apenas se existirem (Suporte a Flat/Modular)
@@ -40,7 +41,7 @@ Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: amd64
 Maintainer: VaGNaroK
-Depends: python3, python3-venv, ffmpeg, yt-dlp, libxcb-cursor0, libxkbcommon-x11-0, libegl1, libgl1
+Depends: python3, python3-venv, ffmpeg, yt-dlp, libxcb-cursor0, libxkbcommon-x11-0, libegl1, libgl1, libmpv-dev
 Section: utils
 Priority: optional
 Description: Conversor multimidia acelerado por GPU (NVENC).
@@ -57,7 +58,7 @@ cd /usr/games/lyra-app
 
 python3 -m venv venv
 ./venv/bin/pip install --upgrade pip
-./venv/bin/pip install PySide6
+./venv/bin/pip install -r requirements.txt
 
 echo "✅ Lyra configurado com sucesso."
 EOF

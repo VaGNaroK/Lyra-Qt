@@ -26,9 +26,10 @@ O **Lyra Multimedia Converter** é uma interface gráfica (GUI) moderna, modular
 Para executar o código-fonte na sua máquina, certifique-se de ter instalado:
 
 1. **Python 3.10** ou superior.
-2. Bibliotecas Python detalhadas no `requirements.txt` (principalmente `PySide6`).
+2. Bibliotecas Python detalhadas no `requirements.txt` (incluindo `PySide6` e `python-mpv`).
 3. **FFmpeg** e **FFprobe** (instalados e disponíveis no PATH do seu sistema).
 4. **yt-dlp** (instalado e disponível no PATH do seu sistema).
+5. **libmpv** (Exigido para o player da aba Sincronia. Instale via `sudo apt install libmpv-dev` no Ubuntu/Mint ou `sudo pacman -S mpv` no Arch).
 
 ---
 

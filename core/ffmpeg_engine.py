@@ -224,6 +224,32 @@ class FFmpegEngine(QObject):
             return tracks
         except Exception:
             return []
+
+    def get_subtitle_tracks(self, file_path):
+        """
+        Lista todas as faixas de legenda disponíveis dentro de um arquivo multimídia.
+        
+        Returns:
+            list: Lista contendo dicionários/tuplas com 'index' (global) e 'label' de cada faixa.
+        """
+        if not os.path.exists(file_path):
+            return []
+        try:
+            cmd = [self.ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_streams", "-select_streams", "s", file_path]
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
+            data = json.loads(result.stdout)
+            tracks = []
+            for stream in data.get("streams", []):
+                global_idx = stream.get("index")
+                lang = stream.get("tags", {}).get("language", "ND").upper()
+                tracks.append((global_idx, f"Faixa {global_idx} - Legenda ({lang})"))
+            return tracks
+        except Exception:
+            return []
     
     def detect_crop(self, file_path):
         """
@@ -422,6 +448,11 @@ class FFmpegEngine(QObject):
         # 3.3. Legendas Originais
         if not is_audio_only and not is_image:
             cmd.extend(["-map", "0:s?"]) # Preserva sempre as legendas originais
+            
+            # Remove faixas marcadas (Mapeamento Negativo)
+            remove_tracks = options.get("remove_sub_tracks", [])
+            for track in remove_tracks:
+                cmd.extend(["-map", f"-0:{track}?"])
 
         # 3.4. Áudios Externos mapeados sequencialmente
         for i in range(len(valid_audios)):
@@ -436,6 +467,11 @@ class FFmpegEngine(QObject):
             cmd.extend(["-c:s", "mov_text" if ext_destino == "mp4" else "srt"])
 
         # 4. Audio Filters
+        audio_offset_ms = options.get("audio_offset_ms", 0)
+        if audio_offset_ms != 0 and options.get("acodec", "default") == "copy":
+            options["acodec"] = "aac" if ext_destino == "mp4" else "default"
+            self.log_updated.emit("⚠️ Sincronia de Áudio ativada: O áudio não pode ser 'copy'. Alterado para recodificação.\n")
+            
         noise_reduction = options.get("noise_reduction", False)
         if noise_reduction and options.get("acodec", "default") == "copy":
             options["acodec"] = "aac" if ext_destino == "mp4" else "default"
@@ -444,8 +480,15 @@ class FFmpegEngine(QObject):
         is_audio_copy = (options.get("acodec", "default") == "copy")
         vol = options.get("volume", 100)
         
+        if audio_offset_ms != 0 and not is_audio_copy:
+            if audio_offset_ms > 0:
+                af_filters.append(f"adelay=delays={int(audio_offset_ms)}:all=1")
+            else:
+                sec = abs(audio_offset_ms) / 1000.0
+                af_filters.append(f"atrim=start={sec},asetpts=PTS-STARTPTS")
+        
         if noise_reduction and not is_audio_copy:
-            model_path = os.path.abspath("cb.rnnn")
+            model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "models", "cb.rnnn")
             if os.path.exists(model_path):
                 escaped_model_path = model_path.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
                 af_filters.append(f"arnndn=m='{escaped_model_path}'")

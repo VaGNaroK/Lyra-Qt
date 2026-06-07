@@ -2,9 +2,16 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.10] - 2026-06-07
+
+### Adicionado
+* **Preview de Filtros de Áudio ao Vivo (Real-Time MPV):** O player de sincronia nativo foi interligado ao painel de configurações de áudio avançadas. Agora é possível escutar em tempo real o efeito do Slider de Volume Linear (0 a 400%), do filtro Inteligente de Normalização de Vozes (DRC / Downmix) e da Redução de Ruído por IA (`cb.rnnn`). As alterações visuais na UI enviam atualizações instantâneas ao motor de áudio `libavfilter` que processa o player, sem a necessidade de recarregar a mídia.
+
 ## [1.1.9] - 2026-06-04
 
 ### Adicionado
+* **Sincronia de Áudio em Tempo Real:** Adicionada a nova aba "Sincronia" que integra o player nativo `libmpv` (via `python-mpv`) para visualização e correção de atraso de áudio em tempo real. A engine FFmpeg foi preparada para injetar atrasos (+ms) via `adelay` e avanços (-ms) via `atrim` + `asetpts`.
+* **Remoção Seletiva de Faixas (Negative Mapping):** Adicionado suporte inteligente à remoção cirúrgica de faixas nativas de legendas. O motor `ffprobe` agora detecta dinamicamente as legendas embutidas e preenche um `QListWidget` na aba "Legendas", permitindo que o usuário marque e descarte múltiplas faixas indesejadas do contêiner final usando mapeamento negativo (`-map -0:X?`).
 * **Busca Profunda de Metadados (Media Info):** O motor agora faz busca profunda na tabela de tags de contêineres MKV/MP4 (`BPS`) para descobrir e reportar bitrates individuais de faixas de vídeo e áudio que antes eram ocultos. Adicionada extração visual clara do formato nativo e proporção de tela real.
 * **Suporte a Múltiplas Faixas Externas:** A interface abandonou os inputs únicos. Adicionado suporte a `QListWidget` nas abas de Áudio e Legenda, permitindo adicionar simultaneamente incontáveis faixas (softsub e áudios multiplexados).
 
@@ -12,6 +19,9 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 * **Algoritmo de Mapeamento Acumulativo (MUX):** O FFmpegEngine foi completamente reescrito para proteger a integridade dos contêineres. Faixas originais (áudios selecionados e *todas* as legendas nativas) são obrigatoriamente protegidas (`-map 0:s?`), enquanto novos áudios e legendas externas são anexados de forma sequencial, encerrando a exclusão acidental de faixas nativas.
 
 ### Corrigido
+* **Regressão de Áudio (Race Condition no MPV):** Corrigido bug de inicialização onde o motor do MPV iniciava mudo. A rotina de auto-pause foi movida para *antes* do carregamento assíncrono da mídia (`play()`), garantindo que os drivers de som (PulseAudio/PipeWire) não sejam interrompidos durante sua alocação de memória.
+* **Integração com Wayland e Encerramento Zombie:** Forçado suporte a `xcb` (X11/XWayland) em sistemas Linux para garantir que a janela embutida (WID) do `libmpv` renderize perfeitamente. Criada rotina segura de terminação do motor de vídeo (`_shutdown_mpv`) que extingue processos zumbis que travavam o encerramento da interface via System Tray.
+* **Empacotamento Universal (MPV):** Scripts nativos de compilação Debian (`package.sh`), Windows (`build_windows.ps1`) e Sandbox (`flatpak`) inteiramente refatorados para realizar o download e integração autônoma das bibliotecas dinâmicas requeridas pelo MPV (`libmpv-2.dll` no Windows, `libmpv-dev` no Linux).
 * **Crash de Renderização por Imagens de Capa (Cover Arts):** Corrigido bug crítico onde a opção "Incluir todas as faixas" usava a flag global `-map 0`, forçando o renderizador de vídeo (CUDA/NVENC) a tentar converter miniaturas PNG da capa do álbum como se fossem vídeos reais.
 
 ## [1.1.8] - 2026-06-03

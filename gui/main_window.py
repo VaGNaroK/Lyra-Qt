@@ -6,13 +6,14 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolBar,
     QStackedWidget, QTableWidget, QTableWidgetItem, QHeaderView, QLabel,
     QComboBox, QFrame, QAbstractItemView, QFileDialog, QTabWidget,
-    QFormLayout, QCheckBox, QSlider, QSpinBox, QLineEdit, QGroupBox,
+    QFormLayout, QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QGroupBox,
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
-    QStyle, QApplication, QInputDialog, QListWidget
+    QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem
 )
 from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices
 from PySide6.QtCore import Qt, QSize, QUrl, QSettings
 from PySide6.QtMultimedia import QSoundEffect
+from gui.mpv_widget import MPVPlayerWidget
 
 # ==============================================================================
 # 🔒 Importação da nossa nova arquitetura modular
@@ -183,10 +184,12 @@ class LyraMainWindow(QMainWindow):
                 if resposta == QMessageBox.Yes:
                     self.engine.stop_all()
                     self.ytdlp_engine.stop()
+                    self._shutdown_mpv()
                     event.accept()
                 else:
                     event.ignore()
             else:
+                self._shutdown_mpv()
                 event.accept()
 
     def force_quit(self):
@@ -199,9 +202,20 @@ class LyraMainWindow(QMainWindow):
             if resposta == QMessageBox.Yes:
                 self.engine.stop_all()
                 self.ytdlp_engine.stop()
+                self._shutdown_mpv()
                 QApplication.instance().quit()
         else:
+            self._shutdown_mpv()
             QApplication.instance().quit()
+
+    def _shutdown_mpv(self):
+        if hasattr(self, 'mpv_widget'):
+            try:
+                self.mpv_widget.stop()
+                if hasattr(self.mpv_widget, 'mpv') and self.mpv_widget.mpv:
+                    self.mpv_widget.mpv.terminate()
+            except Exception:
+                pass
 
     def setup_ui(self):
         """
@@ -345,6 +359,7 @@ class LyraMainWindow(QMainWindow):
         advanced_layout = QVBoxLayout(self.advanced_page)
         self.tab_widget = QTabWidget()
         self.create_audio_tab()
+        self.create_sync_tab()
         self.create_video_tab()
         self.create_image_tab()
         self.create_subtitle_tab()
@@ -458,14 +473,17 @@ class LyraMainWindow(QMainWindow):
         self.chk_all_tracks.toggled.connect(lambda checked: self.combo_audio_track.setEnabled(not checked))
 
         self.chk_audio_drc = QCheckBox("Normalizar Vozes / Downmix 5.1 (DRC)")
+        self.chk_audio_drc.stateChanged.connect(self._sync_live_audio_filters)
         
         self.chk_noise_reduction = QCheckBox("Reduzir Ruído de Fundo (Rede Neural RNNoise)")
+        self.chk_noise_reduction.stateChanged.connect(self._sync_live_audio_filters)
         
         self.slider_volume = QSlider(Qt.Horizontal)
         self.slider_volume.setRange(0, 400)
         self.slider_volume.setValue(100)
         self.lbl_volume_val = QLabel("100%")
         self.slider_volume.valueChanged.connect(lambda v: self.lbl_volume_val.setText(f"{v}%"))
+        self.slider_volume.valueChanged.connect(self._sync_live_audio_filters)
         
         vol_layout = QHBoxLayout()
         vol_layout.addWidget(self.slider_volume)
@@ -506,6 +524,55 @@ class LyraMainWindow(QMainWindow):
         
         # 🔒 AQUI ESTAVA O PROBLEMA: A linha abaixo tinha desaparecido do seu código!
         self.tab_widget.addTab(tab, "🎵 Áudio")
+
+    def create_sync_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        
+        self.mpv_widget = MPVPlayerWidget(self)
+        self.mpv_widget.setMinimumHeight(300)
+        layout.addWidget(self.mpv_widget, 1)
+        
+        controls_layout = QHBoxLayout()
+        self.slider_audio_sync = QSlider(Qt.Horizontal)
+        self.slider_audio_sync.setRange(-5000, 5000)
+        self.slider_audio_sync.setValue(0)
+        
+        self.spin_audio_sync = QDoubleSpinBox()
+        self.spin_audio_sync.setRange(-5.0, 5.0)
+        self.spin_audio_sync.setSingleStep(0.1)
+        self.spin_audio_sync.setSuffix("s")
+        
+        def update_from_slider(val):
+            sec = val / 1000.0
+            self.spin_audio_sync.blockSignals(True)
+            self.spin_audio_sync.setValue(sec)
+            self.spin_audio_sync.blockSignals(False)
+            self.mpv_widget.set_audio_delay(sec)
+            
+        def update_from_spin(val):
+            ms = int(val * 1000)
+            self.slider_audio_sync.blockSignals(True)
+            self.slider_audio_sync.setValue(ms)
+            self.slider_audio_sync.blockSignals(False)
+            self.mpv_widget.set_audio_delay(val)
+            
+        self.slider_audio_sync.valueChanged.connect(update_from_slider)
+        self.spin_audio_sync.valueChanged.connect(update_from_spin)
+        
+        btn_play = QPushButton("▶️ Play/Pause")
+        try:
+            btn_play.clicked.connect(lambda: self.mpv_widget.pause(not self.mpv_widget.mpv.pause))
+        except:
+            pass # handle gracefully if mpv not initialized
+        
+        controls_layout.addWidget(QLabel("⏳ Atraso de Áudio:"))
+        controls_layout.addWidget(self.slider_audio_sync)
+        controls_layout.addWidget(self.spin_audio_sync)
+        controls_layout.addWidget(btn_play)
+        
+        layout.addLayout(controls_layout)
+        self.tab_widget.addTab(tab, "⏱️ Sincronia")
 
     def create_video_tab(self):
         tab = QWidget()
@@ -667,6 +734,14 @@ class LyraMainWindow(QMainWindow):
         extract_note.setStyleSheet("color: gray;")
         extract_layout.addRow(extract_note)
         layout.addWidget(group_extract)
+
+        group_remove = QGroupBox("🚫 Remoção de Faixas Nativas (Descarte)")
+        group_remove.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
+        remove_layout = QVBoxLayout(group_remove)
+        self.list_sub_remove_tracks = QListWidget()
+        self.list_sub_remove_tracks.setFixedHeight(80)
+        remove_layout.addWidget(self.list_sub_remove_tracks)
+        layout.addWidget(group_remove)
 
         layout.addStretch()
         self.tab_widget.addTab(tab, "📝 Legendas")
@@ -866,6 +941,8 @@ class LyraMainWindow(QMainWindow):
         
         # 🔒 AQUI ESTAVA O PROBLEMA: Código duplicado limpo para uma única execução fluida
         if os.path.exists(file_path):
+            if hasattr(self, 'mpv_widget'):
+                self.mpv_widget.play(file_path)
             self.text_media_info.setPlainText("A analisar mídia...")
             info_text = self.engine.get_human_media_info(file_path)
             self.text_media_info.setPlainText(info_text)
@@ -879,6 +956,25 @@ class LyraMainWindow(QMainWindow):
                 self.combo_audio_track.addItem(desc, track_idx)
                 
             self.combo_audio_track.blockSignals(False)
+
+            self.list_sub_remove_tracks.clear()
+            sub_tracks = self.engine.get_subtitle_tracks(file_path)
+            for track_idx, desc in sub_tracks:
+                item = QListWidgetItem(desc)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Unchecked)
+                item.setData(Qt.UserRole, track_idx)
+                self.list_sub_remove_tracks.addItem(item)
+                
+            self._sync_live_audio_filters()
+
+    def _sync_live_audio_filters(self, *args):
+        if hasattr(self, 'mpv_widget'):
+            self.mpv_widget.update_audio_filters(
+                self.slider_volume.value(),
+                self.chk_audio_drc.isChecked(),
+                self.chk_noise_reduction.isChecked()
+            )
 
     def switch_page(self, index):
         self.stacked_widget.setCurrentIndex(index)
@@ -972,8 +1068,10 @@ class LyraMainWindow(QMainWindow):
             "audio_paths": [self.list_external_audios.item(i).text() for i in range(self.list_external_audios.count())],
             "sub_mode": self.combo_sub_mode.currentIndex(),
             "extract_sub_track": self.combo_sub_extract_track.currentIndex(),
+            "remove_sub_tracks": [self.list_sub_remove_tracks.item(i).data(Qt.UserRole) for i in range(self.list_sub_remove_tracks.count()) if self.list_sub_remove_tracks.item(i).checkState() == Qt.Checked],
             "rotate": self.combo_rotate.currentText(),
             "deinterlace": self.chk_deinterlace.isChecked(),
+            "audio_offset_ms": getattr(self, 'slider_audio_sync', None).value() if hasattr(self, 'slider_audio_sync') else 0,
             "fade_dur": self.spin_fade_duration.value(),
             "fade_pos": self.combo_fade_pos.currentText(),
             "fade_type": self.combo_fade_type.currentText(),

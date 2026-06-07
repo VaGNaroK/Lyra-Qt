@@ -23,5 +23,8 @@ Responsável por apresentar os controles ao usuário de forma amigável e limpa.
 * **`main_window.py`**:
   - Classe `LyraMainWindow`: A janela principal do aplicativo (PySide6).
   - Responsabilidades: Criação de abas dinâmicas, validação de entradas, interações do usuário, conexão de signals do motor para atualização de progresso (barras e logs), integração na bandeja do sistema (System Tray) e notificações.
+* **`mpv_widget.py`**:
+  - Classe `MPVPlayerWidget`: Wrapper modular.
+  - Responsabilidades: Integração do core C++ nativo do `libmpv` em container do PySide6. Gerenciamento do ciclo de vida do player (embed WID/X11), sincronia de parâmetros e encerramento limpo (evitando zombie processes).
 * **`dialogs/`** (Submódulo opcional):
   - Pop-ups de configuração e diálogos adicionais.

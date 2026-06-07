@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 # 🔒 ÚNICA FONTE DA VERDADE (Single Source of Truth)
 # O package.sh faz grep '^__version__' para extrair este valor.
 # ==============================================================================
-__version__ = "1.1.9"
+__version__ = "1.1.10"
 
 # ==============================================================================
 # 🔒 DETECÇÃO DE AMBIENTE FLATPAK
@@ -39,6 +39,10 @@ except ImportError:
     from main_window import LyraMainWindow
 
 if __name__ == "__main__":
+    # Força o uso do X11 (xcb) no Linux porque o Wayland não permite embed de wid no mpv
+    if sys.platform.startswith('linux'):
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
+
     # Silencia log informativo do Qt Multimedia (cosmético)
     os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.ffmpeg=false")
 

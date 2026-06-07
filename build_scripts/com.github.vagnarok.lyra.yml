@@ -36,7 +36,7 @@ modules:
       build-args:
         - --share=network
     build-commands:
-      - pip3 install --prefix=/app PySide6 yt-dlp
+      - pip3 install --prefix=/app PySide6 yt-dlp python-mpv
 
   # ----------------------------------------------------------------------------
   # Modulo 2: FFmpeg Estático (Poder Total com NVENC, x264, x265, etc)
