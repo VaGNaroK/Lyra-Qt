@@ -18,8 +18,7 @@ class MPVPlayerWidget(QWidget):
                            log_handler=print,
                            loglevel='error',
                            input_default_bindings=True,
-                           input_vo_keyboard=True,
-                           osc=True)
+                           input_vo_keyboard=True)
                            
     def play(self, filepath):
         if os.path.exists(filepath):
