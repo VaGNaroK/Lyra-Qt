@@ -77,8 +77,6 @@ modules:
       - -Djavascript=disabled
       - -Duchardet=disabled
       - -Dvulkan=disabled
-      - -Dwayland=disabled
-      - -Dx11=disabled
     sources:
       - type: archive
         url: https://github.com/mpv-player/mpv/archive/v0.35.1.tar.gz
