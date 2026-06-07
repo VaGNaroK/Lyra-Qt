@@ -54,6 +54,37 @@ modules:
       - chmod +x /app/bin/ffmpeg /app/bin/ffprobe
 
 # ----------------------------------------------------------------------------
+  # Modulo 2.5: Compilação do libass (Dependência obrigatória do MPV)
+  # ----------------------------------------------------------------------------
+  - name: libass
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://github.com/libass/libass/releases/download/0.17.1/libass-0.17.1.tar.gz
+        sha256: d653be97198a0543c69111122173c41a99e0b91426f9e17f06a858982c2fb03d
+
+  # ----------------------------------------------------------------------------
+  # Modulo 2.6: libmpv (Motor de Áudio/Vídeo e Filtros LAVFI)
+  # ----------------------------------------------------------------------------
+  - name: libmpv
+    buildsystem: meson
+    config-opts:
+      - -Dlibmpv=true
+      - -Dcplayer=false
+      - -Dalsa=disabled
+      - -Dpulse=enabled
+      - -Dlua=disabled
+      - -Djavascript=disabled
+      - -Duchardet=disabled
+      - -Dvulkan=disabled
+      - -Dwayland=disabled
+      - -Dx11=disabled
+    sources:
+      - type: archive
+        url: https://github.com/mpv-player/mpv/archive/v0.35.1.tar.gz
+        sha256: 41df981b7b84e33a2ef4478aaf81d6f4f5c8b9cd2c0d337ac142fc20b387d1a9
+
+  # ----------------------------------------------------------------------------
   # Modulo 3: O Aplicativo Lyra-Qt (Isolamento de Código Ativo)
   # ----------------------------------------------------------------------------
   - name: lyra-app
