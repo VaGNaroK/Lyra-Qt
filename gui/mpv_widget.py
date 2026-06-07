@@ -26,8 +26,6 @@ class MPVPlayerWidget(QWidget):
         if sys.platform.startswith('linux'):
             mpv_opts['vo'] = 'gpu'
             mpv_opts['gpu_context'] = 'auto'
-            # Desativa DRM direto que causa erro de permissão no Sandbox
-            mpv_opts['drm_mode'] = 'auto'
 
         # Inicializa o player MPV
         self.mpv = mpv.MPV(**mpv_opts)
