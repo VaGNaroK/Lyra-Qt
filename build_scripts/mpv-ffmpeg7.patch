@@ -1,5 +1,5 @@
---- a/demux/demux_lavf.c	2026-06-08 10:10:14.014116604 -0300
-+++ b/demux/demux_lavf.c	2026-06-08 10:10:14.015513450 -0300
+--- a/demux/demux_lavf.c	2026-06-08 10:18:30.750325925 -0300
++++ b/demux/demux_lavf.c	2026-06-08 10:18:30.751521584 -0300
 @@ -258,7 +258,7 @@
      int num_nested;
      int (*default_io_open)(struct AVFormatContext *s, AVIOContext **pb,
@@ -39,8 +39,8 @@
      } else {
          avfc->io_open = block_io_open;
      }
---- a/filters/f_lavfi.c	2026-06-08 10:10:14.319111492 -0300
-+++ b/filters/f_lavfi.c	2026-06-08 10:10:14.320207151 -0300
+--- a/filters/f_lavfi.c	2026-06-08 10:18:31.009724679 -0300
++++ b/filters/f_lavfi.c	2026-06-08 10:18:31.010103447 -0300
 @@ -1026,7 +1026,7 @@
      case AV_OPT_TYPE_VIDEO_RATE:        return "fps";
      case AV_OPT_TYPE_DURATION:          return "duration";
@@ -50,3 +50,14 @@
      case AV_OPT_TYPE_BOOL:              return "bool";
      case AV_OPT_TYPE_CONST: // fallthrough
      default:
+--- a/video/decode/vd_lavc.c	2026-06-08 10:18:31.332281933 -0300
++++ b/video/decode/vd_lavc.c	2026-06-08 10:18:31.332571162 -0300
+@@ -1156,7 +1156,7 @@
+     mpi->dts = mp_pts_from_av(ctx->pic->pkt_dts, &ctx->codec_timebase);
+ 
+     mpi->pkt_duration =
+-        mp_pts_from_av(ctx->pic->pkt_duration, &ctx->codec_timebase);
++        mp_pts_from_av(ctx->pic->duration, &ctx->codec_timebase);
+ 
+     av_frame_unref(ctx->pic);
+ 
