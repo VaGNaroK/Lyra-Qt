@@ -48,20 +48,7 @@ modules:
     build-commands:
       - pip3 install --prefix=/app PySide6 yt-dlp python-mpv
 
-  # ----------------------------------------------------------------------------
-  # Modulo 2: FFmpeg Estático (Poder Total com NVENC, x264, x265, etc)
-  # ----------------------------------------------------------------------------
-  - name: ffmpeg-static
-    buildsystem: simple
-    build-options:
-      build-args:
-        - --share=network
-    build-commands:
-      - curl -L -o ffmpeg.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
-      - tar -xf ffmpeg.tar.xz
-      - cp ffmpeg-master-latest-linux64-gpl/bin/ffmpeg /app/bin/
-      - cp ffmpeg-master-latest-linux64-gpl/bin/ffprobe /app/bin/
-      - chmod +x /app/bin/ffmpeg /app/bin/ffprobe
+
 
 # ----------------------------------------------------------------------------
   # Modulo 2.5: Compilação do libass (Dependência obrigatória do MPV)

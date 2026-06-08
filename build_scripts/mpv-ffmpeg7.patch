@@ -1,5 +1,5 @@
---- a/demux/demux_lavf.c	2026-06-08 10:28:36.896076996 -0300
-+++ b/demux/demux_lavf.c	2026-06-08 10:28:36.896707396 -0300
+--- a/demux/demux_lavf.c	2026-06-08 10:48:31.818065032 -0300
++++ b/demux/demux_lavf.c	2026-06-08 10:48:31.818652202 -0300
 @@ -258,7 +258,7 @@
      int num_nested;
      int (*default_io_open)(struct AVFormatContext *s, AVIOContext **pb,
@@ -39,8 +39,8 @@
      } else {
          avfc->io_open = block_io_open;
      }
---- a/filters/f_lavfi.c	2026-06-08 10:28:37.180136978 -0300
-+++ b/filters/f_lavfi.c	2026-06-08 10:28:37.180486458 -0300
+--- a/filters/f_lavfi.c	2026-06-08 10:48:32.104166188 -0300
++++ b/filters/f_lavfi.c	2026-06-08 10:48:32.104406778 -0300
 @@ -1026,7 +1026,7 @@
      case AV_OPT_TYPE_VIDEO_RATE:        return "fps";
      case AV_OPT_TYPE_DURATION:          return "duration";
@@ -50,8 +50,8 @@
      case AV_OPT_TYPE_BOOL:              return "bool";
      case AV_OPT_TYPE_CONST: // fallthrough
      default:
---- a/video/decode/vd_lavc.c	2026-06-08 10:28:37.468292102 -0300
-+++ b/video/decode/vd_lavc.c	2026-06-08 10:28:37.468483562 -0300
+--- a/video/decode/vd_lavc.c	2026-06-08 10:48:32.376197381 -0300
++++ b/video/decode/vd_lavc.c	2026-06-08 10:48:32.376557751 -0300
 @@ -1156,7 +1156,7 @@
      mpi->dts = mp_pts_from_av(ctx->pic->pkt_dts, &ctx->codec_timebase);
  
@@ -61,9 +61,17 @@
  
      av_frame_unref(ctx->pic);
  
---- a/video/sws_utils.c	2026-06-08 10:28:37.751758973 -0300
-+++ b/video/sws_utils.c	2026-06-08 10:28:37.752078403 -0300
-@@ -303,11 +303,11 @@
+--- a/video/sws_utils.c	2026-06-08 10:48:32.652941631 -0300
++++ b/video/sws_utils.c	2026-06-08 10:48:32.653113971 -0300
+@@ -21,6 +21,7 @@
+ #include <libavcodec/avcodec.h>
+ #include <libavutil/bswap.h>
+ #include <libavutil/opt.h>
++#include <libavutil/pixdesc.h>
+ 
+ #include "config.h"
+ 
+@@ -303,11 +304,11 @@
      int cr_src = mp_chroma_location_to_av(src.chroma_location);
      int cr_dst = mp_chroma_location_to_av(dst.chroma_location);
      int cr_xpos, cr_ypos;
