@@ -88,6 +88,8 @@ modules:
   # ----------------------------------------------------------------------------
   - name: libmpv
     buildsystem: meson
+    build-options:
+      cflags: "-Wno-error=incompatible-pointer-types"
     config-opts:
       - -Dlibmpv=true
       - -Dcplayer=false
