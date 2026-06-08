@@ -31,8 +31,8 @@ class MPVPlayerWidget(QWidget):
         self.video_widget = QWidget(self)
         self.video_widget.setAttribute(Qt.WA_DontCreateNativeAncestors)
         self.video_widget.setAttribute(Qt.WA_NativeWindow)
-        # Ocupa todo o espaço vertical disponível
-        self.video_widget.setSizePolicy(self.sizePolicy().Expanding, self.sizePolicy().Expanding)
+        from PySide6.QtWidgets import QSizePolicy
+        self.video_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.layout.addWidget(self.video_widget, stretch=1)
 
         # Barra de Controles Nativos do Qt
