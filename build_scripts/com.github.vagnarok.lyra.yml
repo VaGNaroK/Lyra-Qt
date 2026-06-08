@@ -104,8 +104,10 @@ modules:
       - -Duchardet=disabled
     sources:
       - type: archive
-        url: https://github.com/mpv-player/mpv/archive/v0.38.0.tar.gz
-        sha256: 86d9ef40b6058732f67b46d0bbda24a074fae860b3eaae05bab3145041303066
+        url: https://github.com/mpv-player/mpv/archive/v0.35.1.tar.gz
+        sha256: 41df981b7b84e33a2ef4478aaf81d6f4f5c8b9cd2c0d337ac142fc20b387d1a9
+      - type: patch
+        path: mpv-ffmpeg7.patch
 
   # ----------------------------------------------------------------------------
   # Modulo 3: O Aplicativo Lyra-Qt (Isolamento de Código Ativo)
