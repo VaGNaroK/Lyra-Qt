@@ -1,5 +1,5 @@
---- a/demux/demux_lavf.c	2026-06-08 09:58:55.482546416 -0300
-+++ b/demux/demux_lavf.c	2026-06-08 09:58:55.483213483 -0300
+--- a/demux/demux_lavf.c	2026-06-08 10:10:14.014116604 -0300
++++ b/demux/demux_lavf.c	2026-06-08 10:10:14.015513450 -0300
 @@ -258,7 +258,7 @@
      int num_nested;
      int (*default_io_open)(struct AVFormatContext *s, AVIOContext **pb,
@@ -39,3 +39,14 @@
      } else {
          avfc->io_open = block_io_open;
      }
+--- a/filters/f_lavfi.c	2026-06-08 10:10:14.319111492 -0300
++++ b/filters/f_lavfi.c	2026-06-08 10:10:14.320207151 -0300
+@@ -1026,7 +1026,7 @@
+     case AV_OPT_TYPE_VIDEO_RATE:        return "fps";
+     case AV_OPT_TYPE_DURATION:          return "duration";
+     case AV_OPT_TYPE_COLOR:             return "color";
+-    case AV_OPT_TYPE_CHANNEL_LAYOUT:    return "channellayout";
++    case AV_OPT_TYPE_CHLAYOUT:    return "channellayout";
+     case AV_OPT_TYPE_BOOL:              return "bool";
+     case AV_OPT_TYPE_CONST: // fallthrough
+     default:
