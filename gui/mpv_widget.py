@@ -27,7 +27,10 @@ class MPVPlayerWidget(QWidget):
             'loglevel': 'error',
             'input_default_bindings': False, # Impede roubo de atalhos do Qt
             'input_vo_keyboard': False,
-            'keep_open': 'yes'
+            'keep_open': 'yes',
+            'hwdec': 'no',
+            'vd': 'h264',
+            'ad': 'eac3,ac3,aac,mp3'
         }
         
         if sys.platform.startswith('linux'):
