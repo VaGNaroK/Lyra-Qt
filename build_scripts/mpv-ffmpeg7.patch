@@ -86,17 +86,17 @@
          av_opt_set_int(ctx->sws, "dst_v_chr_pos", cr_ypos, 0);
      }
 
---- a/filters/f_swresample.c
-+++ b/filters/f_swresample.c
-@@ -25,6 +25,7 @@
- #include <libavutil/opt.h>
+--- a/filters/f_swresample.c	2026-06-08 12:42:02.788516698 -0300
++++ b/filters/f_swresample.c	2026-06-08 12:42:33.769116508 -0300
+@@ -20,6 +20,7 @@
  #include <libavutil/samplefmt.h>
+ #include <libavutil/channel_layout.h>
  #include <libavutil/mathematics.h>
 +#include <libavutil/channel_layout.h>
  #include <libswresample/swresample.h>
  
- #include "audio/chmap.h"
-@@ -272,8 +273,15 @@
+ #include "config.h"
+@@ -272,8 +273,13 @@
      out_ch_layout = fudge_layout_conversion(p, in_ch_layout, out_ch_layout);
  
      // Real conversion; output is input to avrctx_out.
@@ -111,7 +111,8 @@
 +    av_channel_layout_uninit(&out_chl);
      av_opt_set_int(p->avrctx, "in_sample_rate",     p->in_rate, 0);
      av_opt_set_int(p->avrctx, "out_sample_rate",    p->out_rate, 0);
-@@ -285,8 +293,12 @@
+     av_opt_set_int(p->avrctx, "in_sample_fmt",      in_samplefmt, 0);
+@@ -285,8 +291,11 @@
      uint64_t fake_out_ch_layout = mp_chmap_to_lavc_unchecked(&fake_chmap);
      if (!fake_out_ch_layout)
          goto error;
@@ -124,3 +125,4 @@
 +    av_channel_layout_uninit(&fake_chl);
  
      av_opt_set_int(p->avrctx_out, "in_sample_fmt",      out_samplefmtp, 0);
+     av_opt_set_int(p->avrctx_out, "out_sample_fmt",     out_samplefmt, 0);
