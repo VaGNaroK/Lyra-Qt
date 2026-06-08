@@ -78,6 +78,7 @@ modules:
     build-options:
       cflags: "-Wno-error=incompatible-pointer-types"
     config-opts:
+      - --libdir=lib
       - -Dlibmpv=true
       - -Dcplayer=false
       - -Dalsa=disabled
