@@ -30,6 +30,8 @@ modules:
   - name: krb5
     subdir: src
     buildsystem: autotools
+    build-options:
+      cflags: "-O2 -g -std=gnu89 -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion"
     sources:
       - type: archive
         url: https://kerberos.org/dist/krb5/1.21/krb5-1.21.2.tar.gz
