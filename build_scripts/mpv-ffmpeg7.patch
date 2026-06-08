@@ -1,5 +1,5 @@
---- demux/demux_lavf.c
-+++ demux/demux_lavf.c
+--- a/demux/demux_lavf.c
++++ b/demux/demux_lavf.c
 @@ -258,7 +258,7 @@
      int (*default_io_open)(struct AVFormatContext *s, AVIOContext **pb,
                             const char *url, int flags,
