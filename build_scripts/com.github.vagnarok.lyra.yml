@@ -106,6 +106,7 @@ modules:
         path: ..
     build-commands:
       # Criação da estrutura de pastas
+      - mkdir -p /app/lib/ffmpeg
       - mkdir -p /app/share/lyra
       - mkdir -p /app/bin
       - mkdir -p /app/share/applications
