@@ -169,6 +169,17 @@ class MPVPlayerWidget(QWidget):
         if self.mpv:
             self.mpv.audio_delay = seconds
 
+    def set_audio_track(self, aid_value):
+        """
+        Altera a faixa de áudio em tempo real no MPV.
+        aid_value: 'auto', 'no', ou inteiro (1, 2, 3...)
+        """
+        if self.mpv:
+            try:
+                self.mpv.aid = aid_value
+            except Exception as e:
+                print(f"Erro ao mudar a faixa de áudio no MPV: {e}")
+
     def stop(self):
         if self.mpv:
             self.mpv.stop()

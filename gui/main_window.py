@@ -468,6 +468,7 @@ class LyraMainWindow(QMainWindow):
         
         self.combo_audio_track = QComboBox()
         self.combo_audio_track.addItem("Padrão (Faixa Principal)", -1)
+        self.combo_audio_track.currentIndexChanged.connect(self._on_audio_track_changed)
         
         self.chk_all_tracks = QCheckBox("Incluir todas as faixas de áudio")
         self.chk_all_tracks.toggled.connect(lambda checked: self.combo_audio_track.setEnabled(not checked))
@@ -975,6 +976,14 @@ class LyraMainWindow(QMainWindow):
                 self.chk_audio_drc.isChecked(),
                 self.chk_noise_reduction.isChecked()
             )
+
+    def _on_audio_track_changed(self, index):
+        if hasattr(self, 'mpv_widget') and hasattr(self.mpv_widget, 'mpv') and self.mpv_widget.mpv:
+            track_idx = self.combo_audio_track.currentData()
+            if track_idx == -1:
+                self.mpv_widget.set_audio_track('auto')
+            else:
+                self.mpv_widget.set_audio_track(track_idx + 1)
 
     def switch_page(self, index):
         self.stacked_widget.setCurrentIndex(index)
