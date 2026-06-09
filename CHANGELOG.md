@@ -5,6 +5,8 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 ## [1.1.10] - 2026-06-07
 
 ### Adicionado
+* **Troca Dinâmica de Faixa de Áudio:** Ao selecionar um idioma/faixa específica de áudio na guia de Configurações Avançadas, o player reflete a escolha quase instantaneamente atualizando a propriedade interna (`aid`) do MPV. Permite o ajuste da sincronia escutando a faixa exata que se deseja manipular.
+* **Controles Nativos de Reprodução PySide6:** Substituição do OSC nativo do MPV, que sofria bloqueios de mouse no ambiente Wayland/Flatpak, por controles `Qt` (Play/Pause, Slider de Progresso temporal, Marcações de tempo). A resposta da barra é totalmente orientada a eventos (`Signals` e `Observers` de propriedades), evitando travamentos de thread principal.
 * **Preview de Filtros de Áudio ao Vivo (Real-Time MPV):** O player de sincronia nativo foi interligado ao painel de configurações de áudio avançadas. Agora é possível escutar em tempo real o efeito do Slider de Volume Linear (0 a 400%), do filtro Inteligente de Normalização de Vozes (DRC / Downmix) e da Redução de Ruído por IA (`cb.rnnn`). As alterações visuais na UI enviam atualizações instantâneas ao motor de áudio `libavfilter` que processa o player, sem a necessidade de recarregar a mídia.
 
 ### Corrigido
