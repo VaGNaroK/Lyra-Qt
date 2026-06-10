@@ -32,6 +32,14 @@ def _resolve_resource_dir():
 
 RESOURCE_DIR = _resolve_resource_dir()
 
+# 🔒 INJEÇÃO DE DLL PATH (CRÍTICO PARA WINDOWS)
+# O pacote python-mpv exige que a DLL (mpv-1.dll ou mpv-2.dll) esteja no %PATH% do sistema
+# antes do próprio módulo ser importado. Aqui nós garantimos que a pasta 'assets/bin' 
+# (onde guardamos o mpv-2.dll) seja exposta para o ambiente.
+assets_bin_path = os.path.join(RESOURCE_DIR, "assets", "bin")
+if os.path.exists(assets_bin_path):
+    os.environ["PATH"] = assets_bin_path + os.pathsep + os.environ.get("PATH", "")
+
 # Importação segura da GUI
 try:
     from gui.main_window import LyraMainWindow
