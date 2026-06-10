@@ -560,7 +560,7 @@ class FFmpegEngine(QObject):
             if vcodec != "default":
                 cmd.extend(["-c:v", vcodec])
                 if "nvenc" in vcodec:
-                    cmd.extend(["-preset", "p7", "-profile:v", "high", "-tune", "hq", "-rc", "vbr", "-cq", "18", "-spatial-aq", "1", "-temporal-aq", "1", "-rc-lookahead", "32", "-b_ref_mode", "2"])
+                    cmd.extend(["-preset", "p7", "-profile:v", "high", "-tune", "hq", "-cq", "18", "-spatial-aq", "1", "-temporal-aq", "1", "-rc-lookahead", "32", "-b_ref_mode", "2"])
 
             threads = options.get("threads", 0)
             if threads > 0 and vcodec in ("libx264", "libx265"):
