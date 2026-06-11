@@ -470,7 +470,9 @@ class FFmpegEngine(QObject):
             for i in range(softsubs_added):
                 cmd.extend(["-map", f"{start_sub_idx + i}:0?"])
             
-            cmd.extend(["-c:s", "mov_text" if ext_destino == "mp4" else "srt"])
+        # Força o codec de legenda compatível com o contêiner
+        if not is_audio_only and not is_image:
+            cmd.extend(["-c:s", "mov_text" if ext_destino == "mp4" else ("copy" if ext_destino == "mkv" else "srt")])
 
         # 4. Audio Filters
         audio_offset_ms = options.get("audio_offset_ms", 0)
