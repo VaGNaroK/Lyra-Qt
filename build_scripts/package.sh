@@ -35,13 +35,23 @@ fi
 
 cp assets/icons/lyra.svg $BUILD_DIR/usr/share/icons/hicolor/scalable/apps/
 
+echo "📥 Baixando e embutindo binários estáticos do FFmpeg (Padrão BtbN)..."
+mkdir -p $BUILD_DIR/usr/games/lyra-app/assets/bin
+wget -q --show-progress "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz" -O ffmpeg-linux.tar.xz
+echo "📦 Extraindo FFmpeg..."
+tar -xf ffmpeg-linux.tar.xz
+cp ffmpeg-master-latest-linux64-gpl/bin/ffmpeg $BUILD_DIR/usr/games/lyra-app/assets/bin/
+cp ffmpeg-master-latest-linux64-gpl/bin/ffprobe $BUILD_DIR/usr/games/lyra-app/assets/bin/
+chmod +x $BUILD_DIR/usr/games/lyra-app/assets/bin/ffmpeg
+chmod +x $BUILD_DIR/usr/games/lyra-app/assets/bin/ffprobe
+rm -rf ffmpeg-linux.tar.xz ffmpeg-master-latest-linux64-gpl
 echo "📝 Criando metadados..."
 cat << EOF > $BUILD_DIR/DEBIAN/control
 Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: amd64
 Maintainer: VaGNaroK
-Depends: python3, python3-venv, ffmpeg, yt-dlp, libxcb-cursor0, libxkbcommon-x11-0, libegl1, libgl1, libmpv-dev
+Depends: python3, python3-venv, yt-dlp, libxcb-cursor0, libxkbcommon-x11-0, libegl1, libgl1, libmpv-dev
 Section: utils
 Priority: optional
 Description: Conversor multimidia acelerado por GPU (NVENC).
