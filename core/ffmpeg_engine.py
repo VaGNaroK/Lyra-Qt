@@ -36,12 +36,18 @@ class FFmpegEngine(QObject):
         self.current_options = {}
 
         import sys
-        if sys.platform == "win32" and self.resource_dir:
-            self.ffmpeg_bin = os.path.join(self.resource_dir, "assets", "bin", "ffmpeg.exe")
-            self.ffprobe_bin = os.path.join(self.resource_dir, "assets", "bin", "ffprobe.exe")
-        else:
-            self.ffmpeg_bin = "ffmpeg"
-            self.ffprobe_bin = "ffprobe"
+        self.ffmpeg_bin = "ffmpeg"
+        self.ffprobe_bin = "ffprobe"
+
+        if self.resource_dir:
+            ext = ".exe" if sys.platform == "win32" else ""
+            local_ffmpeg = os.path.join(self.resource_dir, "assets", "bin", f"ffmpeg{ext}")
+            local_ffprobe = os.path.join(self.resource_dir, "assets", "bin", f"ffprobe{ext}")
+            
+            if os.path.isfile(local_ffmpeg):
+                self.ffmpeg_bin = local_ffmpeg
+            if os.path.isfile(local_ffprobe):
+                self.ffprobe_bin = local_ffprobe
 
     def format_time(self, seconds):
         """

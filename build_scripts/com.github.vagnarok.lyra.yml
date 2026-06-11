@@ -152,3 +152,19 @@ modules:
         exec python3 /app/share/lyra/main.py "$@"
         EOF
       - chmod +x /app/bin/lyra
+  # ----------------------------------------------------------------------------
+  # Modulo 4: FFmpeg Estático (BtbN) para Suporte a NVENC
+  # ----------------------------------------------------------------------------
+  - name: ffmpeg-btbn
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    build-commands:
+      - wget -q https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz -O ffmpeg.tar.xz
+      - tar -xf ffmpeg.tar.xz
+      - mkdir -p /app/share/lyra/assets/bin
+      - cp ffmpeg-master-latest-linux64-gpl/bin/ffmpeg /app/share/lyra/assets/bin/
+      - cp ffmpeg-master-latest-linux64-gpl/bin/ffprobe /app/share/lyra/assets/bin/
+      - chmod +x /app/share/lyra/assets/bin/ffmpeg
+      - chmod +x /app/share/lyra/assets/bin/ffprobe
