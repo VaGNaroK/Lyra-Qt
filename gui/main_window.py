@@ -6,12 +6,12 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QToolBar,
     QStackedWidget, QTableWidget, QTableWidgetItem, QHeaderView, QLabel,
     QComboBox, QFrame, QAbstractItemView, QFileDialog, QTabWidget,
-    QFormLayout, QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QGroupBox,
+    QFormLayout, QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QGroupBox, QTimeEdit,
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
     QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem
 )
 from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices
-from PySide6.QtCore import Qt, QSize, QUrl, QSettings
+from PySide6.QtCore import Qt, QSize, QUrl, QSettings, QTime
 from PySide6.QtMultimedia import QSoundEffect
 from gui.mpv_widget import MPVPlayerWidget
 
@@ -360,6 +360,7 @@ class LyraMainWindow(QMainWindow):
         self.tab_widget = QTabWidget()
         self.create_audio_tab()
         self.create_sync_tab()
+        self.create_trim_tab()
         self.create_video_tab()
         self.create_image_tab()
         self.create_subtitle_tab()
@@ -574,6 +575,49 @@ class LyraMainWindow(QMainWindow):
         
         layout.addLayout(controls_layout)
         self.tab_widget.addTab(tab, "⏱️ Sincronia")
+
+    def create_trim_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        self.chk_enable_trim = QCheckBox("✂️ Ativar Corte de Vídeo (Trimming)")
+        self.chk_enable_trim.setChecked(False)
+        layout.addWidget(self.chk_enable_trim)
+
+        self.mpv_widget_trim = MPVPlayerWidget(self)
+        self.mpv_widget_trim.setMinimumHeight(300)
+        layout.addWidget(self.mpv_widget_trim, 1)
+
+        controls_layout = QHBoxLayout()
+
+        self.time_start = QTimeEdit()
+        self.time_start.setDisplayFormat("HH:mm:ss.zzz")
+        self.btn_mark_start = QPushButton("⏱️ Marcar Início")
+
+        self.time_end = QTimeEdit()
+        self.time_end.setDisplayFormat("HH:mm:ss.zzz")
+        self.btn_mark_end = QPushButton("⏱️ Marcar Fim")
+
+        def set_time_from_mpv(time_edit):
+            if hasattr(self.mpv_widget_trim, 'mpv') and self.mpv_widget_trim.mpv:
+                pos = self.mpv_widget_trim.mpv.time_pos
+                if pos is not None:
+                    ms = int(pos * 1000)
+                    time_edit.setTime(QTime(0, 0).addMSecs(ms))
+
+        self.btn_mark_start.clicked.connect(lambda: set_time_from_mpv(self.time_start))
+        self.btn_mark_end.clicked.connect(lambda: set_time_from_mpv(self.time_end))
+
+        controls_layout.addWidget(QLabel("De:"))
+        controls_layout.addWidget(self.time_start)
+        controls_layout.addWidget(self.btn_mark_start)
+        controls_layout.addStretch()
+        controls_layout.addWidget(QLabel("Até:"))
+        controls_layout.addWidget(self.time_end)
+        controls_layout.addWidget(self.btn_mark_end)
+
+        layout.addLayout(controls_layout)
+        self.tab_widget.addTab(tab, "✂️ Cortes")
 
     def create_video_tab(self):
         tab = QWidget()
@@ -944,6 +988,8 @@ class LyraMainWindow(QMainWindow):
         if os.path.exists(file_path):
             if hasattr(self, 'mpv_widget'):
                 self.mpv_widget.play(file_path)
+            if hasattr(self, 'mpv_widget_trim'):
+                self.mpv_widget_trim.play(file_path)
             self.text_media_info.setPlainText("A analisar mídia...")
             info_text = self.engine.get_human_media_info(file_path)
             self.text_media_info.setPlainText(info_text)
@@ -1078,6 +1124,9 @@ class LyraMainWindow(QMainWindow):
             "sub_mode": self.combo_sub_mode.currentIndex(),
             "extract_sub_track": self.combo_sub_extract_track.currentIndex(),
             "remove_sub_tracks": [self.list_sub_remove_tracks.item(i).data(Qt.UserRole) for i in range(self.list_sub_remove_tracks.count()) if self.list_sub_remove_tracks.item(i).checkState() == Qt.Checked],
+            "trim_enabled": hasattr(self, 'chk_enable_trim') and self.chk_enable_trim.isChecked(),
+            "trim_start": self.time_start.time().toString("HH:mm:ss.zzz") if hasattr(self, 'time_start') else "00:00:00.000",
+            "trim_end": self.time_end.time().toString("HH:mm:ss.zzz") if hasattr(self, 'time_end') else "00:00:00.000",
             "rotate": self.combo_rotate.currentText(),
             "deinterlace": self.chk_deinterlace.isChecked(),
             "audio_offset_ms": getattr(self, 'slider_audio_sync', None).value() if hasattr(self, 'slider_audio_sync') else 0,

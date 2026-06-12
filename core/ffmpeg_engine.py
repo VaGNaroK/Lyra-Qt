@@ -408,6 +408,16 @@ class FFmpegEngine(QObject):
         if not is_image and not is_audio_only and "nvenc" in vcodec:
             cmd.extend(["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"])
 
+        # 1.5 Cortes Temporais (Trimming)
+        trim_enabled = options.get("trim_enabled", False)
+        if trim_enabled and not is_image:
+            trim_start = options.get("trim_start", "00:00:00.000")
+            trim_end = options.get("trim_end", "00:00:00.000")
+            if trim_start != "00:00:00.000":
+                cmd.extend(["-ss", trim_start])
+            if trim_end != "00:00:00.000":
+                cmd.extend(["-to", trim_end])
+
         # 2. Input File and Subtitles
         cmd.extend(["-i", input_file])
         vf_filters = []
