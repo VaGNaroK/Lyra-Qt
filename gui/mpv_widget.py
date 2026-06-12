@@ -91,6 +91,9 @@ class MPVPlayerWidget(QWidget):
         }
 
         if sys.platform.startswith('linux'):
+            # Silencia os logs diretos de libva (que ignoram o msg_level do MPV e cospem no stderr)
+            os.environ['LIBVA_MESSAGING_LEVEL'] = '0'
+            
             mpv_opts['vo'] = 'gpu'
             mpv_opts['gpu_api'] = 'opengl'
             mpv_opts['gpu_context'] = 'auto'

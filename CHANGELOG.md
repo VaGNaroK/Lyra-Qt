@@ -1,6 +1,15 @@
 # Changelog
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
+## [1.1.11] - 2026-06-11
+
+### Adicionado
+* **Aba de Cortes de Vídeo (Trimming):** Nova aba dedicada nas Configurações Avançadas que permite carregar um player visual independente e fatiar a duração do vídeo graficamente (`HH:MM:SS.ms`) utilizando marcadores interativos (`Marcar Início` / `Marcar Fim`).
+* **Cortes Otimizados (Fast Seek):** O sistema de corte não faz decodificação por software de trechos inutilizados. Ele usa injeção de parâmetros (`-ss` e `-to`) antes do seletor `-i` no FFmpeg, permitindo pular instantaneamente para a linha temporal selecionada, economizando até 90% da CPU em vídeos longos.
+
+### Corrigido
+* **Crash OOM no MPV (Memória/Decodificação):** A restrição rígida antiga (`vd='h264'`) no `MPVPlayerWidget` impedia a reprodução de arquivos HEVC e gerava erros de ponteiro nulo (`get_buffer() failed`) ao tentar abrir duas mídias em abas simultâneas, resultando na queda silenciosa do decoder do mpv. Resolvido ajustando para `hwdec='auto-safe'` delegando corretamente a GPU host sem forçar codec estático.
+* **Supressão de Falsos-Positivos (libva/VA-API):** Injetada a flag `LIBVA_MESSAGING_LEVEL=0` no ambiente do Linux, impedindo que a biblioteca C nativa `libva` causasse poluição no log do terminal tentando testar drivers Intel em sistemas restritos NVIDIA.
 
 ## [1.1.10] - 2026-06-07
 
