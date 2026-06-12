@@ -87,9 +87,7 @@ class MPVPlayerWidget(QWidget):
             'input_default_bindings': False, # Impede roubo de atalhos do Qt
             'input_vo_keyboard': False,
             'keep_open': 'yes',
-            'hwdec': 'no',
-            'vd': 'h264',
-            'ad': 'eac3,ac3,aac,mp3'
+            'hwdec': 'auto-safe',
         }
 
         if sys.platform.startswith('linux'):
@@ -98,6 +96,8 @@ class MPVPlayerWidget(QWidget):
             mpv_opts['gpu_context'] = 'auto'
             mpv_opts['force_window'] = 'no'
             mpv_opts['terminal'] = 'no'
+            # Desativa o log verboso de drivers não encontrados (VAAPI) do X11/DRM
+            mpv_opts['msg_level'] = 'all=fatal'
 
         try:
             self.mpv = mpv.MPV(**mpv_opts)
