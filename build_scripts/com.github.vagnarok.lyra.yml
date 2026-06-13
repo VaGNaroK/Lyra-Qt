@@ -189,7 +189,6 @@ modules:
       - --enable-nonfree
       - --enable-ffnvcodec
       - --enable-nvenc
-      - --enable-cuda-llvm
       - --enable-libx264
       - --enable-libmp3lame
       - --enable-libopus
