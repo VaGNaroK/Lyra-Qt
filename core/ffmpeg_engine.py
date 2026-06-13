@@ -624,7 +624,7 @@ class FFmpegEngine(QObject):
                     if orig_w > 0 and orig_h > 0:
                         calculated_h = int((target_w * orig_h) / orig_w)
                         target_h = calculated_h + 1 if calculated_h % 2 != 0 else calculated_h
-                    vf_filters.append(f"scale_cuda={target_w}:{target_h}")
+                    vf_filters.append(f"scale_cuda=w={target_w}:h={target_h}")
                 else:
                     vf_filters.append(f"scale={target_w}:-2:flags=lanczos,setsar=1")
 
