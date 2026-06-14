@@ -1324,6 +1324,38 @@ class LyraMainWindow(QMainWindow):
         self.spin_pad_right.setValue(0)
         
         self.entry_extra_args.setText("")
+        
+        # Aba Imagem
+        if hasattr(self, 'combo_img_size'):
+            self.combo_img_size.blockSignals(True)
+            self.combo_img_size.setCurrentIndex(0)
+            self.combo_img_size.blockSignals(False)
+        if hasattr(self, 'slider_img_quality'):
+            self.slider_img_quality.setValue(2)
+
+        # Aba Legendas
+        if hasattr(self, 'list_external_subs'):
+            self.list_external_subs.clear()
+        if hasattr(self, 'combo_sub_extract_track'):
+            self.combo_sub_extract_track.setCurrentIndex(0)
+        if hasattr(self, 'list_sub_remove_tracks'):
+            self.list_sub_remove_tracks.clear()
+
+        # Aba Sincronia
+        if hasattr(self, 'slider_audio_sync'):
+            self.slider_audio_sync.setValue(0)
+        if hasattr(self, 'spin_audio_sync'):
+            self.spin_audio_sync.setValue(0.0)
+
+        # Aba Corte (Trimming)
+        from PySide6.QtCore import QTime
+        if hasattr(self, 'chk_enable_trim'):
+            self.chk_enable_trim.setChecked(False)
+        if hasattr(self, 'time_start'):
+            self.time_start.setTime(QTime(0, 0))
+        if hasattr(self, 'time_end'):
+            self.time_end.setTime(QTime(0, 0))
+
         self.update_video_codec_ui()
 
     def save_new_preset(self):
