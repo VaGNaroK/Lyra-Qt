@@ -28,3 +28,18 @@ Este documento acompanha bugs e regressões resolvidos ao longo do projeto, para
 - **Problema**: O diretório escolhido pelo usuário para salvar os arquivos ("Destino da conversão") era redefinido para a pasta padrão do sistema (Ex: `~/Vídeos/Lyra`) toda vez que a aplicação era reiniciada.
 - **Sintoma**: O usuário tinha que reconfigurar o diretório de destino a cada nova execução do software.
 - **Fix (🔒)**: Implementação da classe `QSettings("Lyra", "Lyra-Qt")` para persistir o caminho e recuperá-lo no método de inicialização da UI de forma automática.
+
+## 7. Falha Crítica do NVENC por Incompatibilidade de Drivers (BtbN)
+- **Problema**: Inicialmente, os empacotadores (Flatpak e DEB) faziam o download forçado dos binários mestres pré-compilados do BtbN. Porém, devido ao BtbN embutir as versões mais recentes das bibliotecas da NVIDIA (API 13.1), o FFmpeg recusava-se a rodar o conversor NVENC em placas de vídeo com drivers minimamente desatualizados (Ex: série 610 ou 5xx).
+- **Sintoma**: Ao usar a interface e apertar "Iniciar Conversão" com a aceleração NVIDIA H.264 ativa, o FFmpeg falhava com erros de inicialização silenciosa devido à divergência de versão do driver.
+- **Fix (🔒)**: Substituído completamente o fornecedor. No pacote `.deb`, passamos a confiar no `ffmpeg` oficial estável dos repositórios nativos via dependência no APT (altamente testado pelas distribuidoras). No Windows, migramos para a ramificação `Essentials` do repositório `Gyan.dev`, que usa headers altamente retrocompatíveis. No Flatpak, passamos a compilar o FFmpeg nativamente a partir do código-fonte injetando cabeçalhos `n12.1.14.0` seguros.
+
+## 8. Crash de Escalonamento NVENC (scale_cuda vs filter)
+- **Problema**: Na tentativa de redimensionar o vídeo (Ex: baixar de 4K para 1080p), injetamos a flag nativa `-hwaccel_output_format cuda` combinada com a sintaxe `-vf scale_cuda`. Contudo, o filtro `scale_cuda` estava ausente nas compilações padrões de Linux e em compilações enxutas (Flatpak sem llvm). Ao recorrer ao `scale` (CPU), ocorria uma interrupção por hardware ("auto_scale_0" format unsupported format cuda).
+- **Sintoma**: Ao escolher converter o tamanho do vídeo, ele iniciava e parava abruptamente.
+- **Fix (🔒)**: O script Python `ffmpeg_engine.py` foi remodelado para aplicar roteamento dinâmico de frame. Se houver redimensionamento ativo (Ex: `vsize` diferente de Padrão), a engine intencionalmente suprime a flag `-hwaccel_output_format cuda`, forçando o FFmpeg a trazer o frame decodificado da GPU para a CPU, fazer o filtro matematicamente lá, e o próprio `h264_nvenc` empurra o resultado de volta para a GPU na fase final de encode.
+
+## 9. Download da Web Falhando no Linux (Conflito yt-dlp APT x PIP)
+- **Problema**: O pacote `.deb` criava um atalho Desktop apontando para o Python nativo do ambiente virtual (`venv`), mas sem exportar todo o `PATH`. Consequentemente, ao executar `QProcess("yt-dlp")`, o Lyra caía no fallback de localizar a versão depreciada do `yt-dlp` disponibilizada pelo sistema via APT, gerando falhas em bypass do YouTube. O Flatpak, curiosamente, funcionava porque seu Sandbox mascarava a versão global.
+- **Sintoma**: O programa dava erro ao tentar buscar dados do vídeo no Debian/Ubuntu.
+- **Fix (🔒)**: Implementação de detecção de ambiente real-time em `ytdlp_engine.py`: O Lyra intercepta `os.path.dirname(sys.executable)` e checa ativamente se o diretório host atual (o `venv` do Python) contém um binário `yt-dlp`. Se encontrar, força o bypass chamando ele com caminho absoluto em vez de delegar ao `PATH` do sistema.
