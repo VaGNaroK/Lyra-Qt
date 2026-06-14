@@ -24,7 +24,12 @@ class YTDLPEngine(QObject):
         if sys.platform == "win32":
             self.ytdlp_bin = os.path.join(self.resource_dir, "assets", "bin", "yt-dlp.exe")
         else:
-            self.ytdlp_bin = "yt-dlp"
+            # Verifica se há um yt-dlp no mesmo diretório do Python atual (ex: dentro do venv)
+            venv_ytdlp = os.path.join(os.path.dirname(sys.executable), "yt-dlp")
+            if os.path.isfile(venv_ytdlp):
+                self.ytdlp_bin = venv_ytdlp
+            else:
+                self.ytdlp_bin = "yt-dlp"
 
     def start_download(self, url: str, dest_path: str, mode: int, options: dict):
         """
