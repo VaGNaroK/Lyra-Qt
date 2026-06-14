@@ -1,6 +1,16 @@
 # Changelog
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
+
+## [1.1.12] - 2026-06-13
+
+### Corrigido
+* **Resolução Universal de yt-dlp:** O motor de download agora identifica e executa dinamicamente o binário do `yt-dlp` contido no próprio ambiente virtual (`venv`), prevenindo que instalações `.deb` tentem utilizar versões severamente desatualizadas dos repositórios APT (o que quebrava o bypass do YouTube).
+* **Falha de Escalonamento de Vídeo (Filter Not Found):** Removido o filtro `scale_cuda` (não compatível com o build nativo do Flatpak sem o LLVM gigante) e refatorado o motor Python para isolar corretamente os fluxos de memória de hardware e software. O Lyra agora transiciona perfeitamente de NVENC para CPU em redimensionamentos, e volta à GPU no encode final, sem crachar.
+* **Refatoração do FFmpeg nos Scripts de Empacotamento:** O FFmpeg do BtbN foi removido dos empacotamentos Flatpak, DEB e Windows por exigir drivers muito recentes (API NVENC 13.1) que quebravam computadores padrão.
+  * **Flatpak:** O FFmpeg 7.0 agora é compilado nativamente usando os cabeçalhos NVIDIA `n12.1.14.0`.
+  * **Debian (.deb):** Usa-se ativamente o pacote oficial `ffmpeg` estável do sistema host via dependência nativa APT.
+  * **Windows:** O build passa a baixar o release "Essentials" do repositório Gyan.dev, focado em altíssima estabilidade e retrocompatibilidade do driver da placa de vídeo.
 ## [1.1.11] - 2026-06-11
 
 ### Adicionado
