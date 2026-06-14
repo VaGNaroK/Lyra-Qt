@@ -299,8 +299,12 @@ class LyraMainWindow(QMainWindow):
         self.btn_delete_preset.clicked.connect(self.delete_selected_preset)
         self.btn_delete_preset.setEnabled(False)
 
+        self.btn_reset_all = QPushButton("🔄 Restaurar Padrões")
+        self.btn_reset_all.clicked.connect(lambda: self.combo_presets.setCurrentIndex(0))
+
         format_layout.addWidget(QLabel("📂 Presets:"))
         format_layout.addWidget(self.combo_presets)
+        format_layout.addWidget(self.btn_reset_all)
         format_layout.addWidget(self.btn_save_preset)
         format_layout.addWidget(self.btn_delete_preset)
         format_layout.addStretch()
@@ -1204,7 +1208,7 @@ class LyraMainWindow(QMainWindow):
         data = self.preset_manager.load_presets()
         self.combo_presets.blockSignals(True)
         self.combo_presets.clear()
-        self.combo_presets.addItem("📁 Carregar Preset Salvo...")
+        self.combo_presets.addItem("🟢 Padrão do Sistema (Automático)")
         for name in data: self.combo_presets.addItem(f"⭐ {name}")
         self.combo_presets.setCurrentIndex(0)
         self.combo_presets.blockSignals(False)
