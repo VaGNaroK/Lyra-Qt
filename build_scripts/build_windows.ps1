@@ -12,14 +12,15 @@ Write-Host "[*] Instalando dependencias (PySide6, yt-dlp, PyInstaller)..." -Fore
 .\venv\Scripts\python.exe -m pip install --upgrade pip
 .\venv\Scripts\pip.exe install -r requirements.txt pyinstaller
 
-# 3. Baixar FFmpeg estatico do BtbN (versao Windows)
-Write-Host "[*] Baixando binarios do FFmpeg..." -ForegroundColor Yellow
-$ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+# 3. Baixar FFmpeg estatico (Gyan.dev - release essentials)
+Write-Host "[*] Baixando binarios do FFmpeg (Gyan.dev)..." -ForegroundColor Yellow
+$ffmpegUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
 Invoke-WebRequest -Uri $ffmpegUrl -OutFile "ffmpeg.zip"
 Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg_temp" -Force
 New-Item -ItemType Directory -Force -Path "assets\bin"
-Copy-Item "ffmpeg_temp\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe" -Destination "assets\bin"
-Copy-Item "ffmpeg_temp\ffmpeg-master-latest-win64-gpl\bin\ffprobe.exe" -Destination "assets\bin"
+$ffmpegDir = Get-ChildItem "ffmpeg_temp" | Where-Object { $_.PSIsContainer } | Select-Object -First 1
+Copy-Item "$($ffmpegDir.FullName)\bin\ffmpeg.exe" -Destination "assets\bin"
+Copy-Item "$($ffmpegDir.FullName)\bin\ffprobe.exe" -Destination "assets\bin"
 Remove-Item "ffmpeg.zip"
 Remove-Item "ffmpeg_temp" -Recurse -Force
 
