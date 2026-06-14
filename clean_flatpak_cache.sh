@@ -26,7 +26,11 @@ for DIR in "${DIRS[@]}"; do
 done
 
 # Remover arquivos .flatpak gerados na raiz
-echo -e "${YELLOW}Limpando pacotes .flatpak residuais...${NC}"
-rm -f *.flatpak
-
+echo -e "${YELLOW}Limpando pacotes (bundles) .flatpak residuais na raiz...${NC}"
+for FLATPAK_FILE in *.flatpak; do
+    if [ -f "$FLATPAK_FILE" ]; then
+        echo -e "Removendo bundle: ${RED}$FLATPAK_FILE${NC}"
+        rm -f "$FLATPAK_FILE"
+    fi
+done
 echo -e "${GREEN}Limpeza concluída! O ambiente está pronto para uma compilação do zero.${NC}"
