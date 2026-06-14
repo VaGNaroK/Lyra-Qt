@@ -1288,6 +1288,40 @@ class LyraMainWindow(QMainWindow):
         finally:
             for c in combos: c.blockSignals(False)
 
+    def _reset_advanced_options(self):
+        combos = [self.combo_video_codec, self.combo_video_bitrate, self.combo_video_size, self.combo_video_fps, 
+                  self.combo_audio_codec, self.combo_audio_bitrate, self.combo_audio_freq, self.combo_audio_channels, 
+                  self.combo_rotate, self.combo_fade_pos, self.combo_fade_type]
+        for c in combos:
+            c.blockSignals(True)
+            c.setCurrentIndex(0)
+            c.blockSignals(False)
+
+        self.chk_2pass.setChecked(False)
+        self.chk_all_tracks.setChecked(False)
+        self.chk_audio_drc.setChecked(False)
+        self.chk_noise_reduction.setChecked(False)
+        self.chk_deinterlace.setChecked(False)
+        self.slider_volume.setValue(100)
+        self.spin_fade_duration.setValue(0)
+        self.slider_threads.setValue(0)
+        self.combo_sub_mode.setCurrentIndex(0)
+        
+        self.group_crop.setChecked(False)
+        self.spin_crop_top.setValue(0)
+        self.spin_crop_bottom.setValue(0)
+        self.spin_crop_left.setValue(0)
+        self.spin_crop_right.setValue(0)
+        
+        self.group_pad.setChecked(False)
+        self.spin_pad_top.setValue(0)
+        self.spin_pad_bottom.setValue(0)
+        self.spin_pad_left.setValue(0)
+        self.spin_pad_right.setValue(0)
+        
+        self.entry_extra_args.setText("")
+        self.update_video_codec_ui()
+
     def save_new_preset(self):
         name, ok = QInputDialog.getText(self, "Salvar Preset", "Nome do Preset:")
         if not ok or not name.strip(): return
@@ -1317,6 +1351,7 @@ class LyraMainWindow(QMainWindow):
     def on_preset_selected(self, index):
         if index == 0:
             self.btn_delete_preset.setEnabled(False)
+            self._reset_advanced_options()
             return
         self.btn_delete_preset.setEnabled(True)
         current = self.combo_presets.itemText(index)
