@@ -516,10 +516,12 @@ class FFmpegEngine(QObject):
             else:
                 self.log_updated.emit("❌ Erro: Arquivo de modelo de ruído 'cb.rnnn' não encontrado na raiz. O filtro foi ignorado.\n")
 
+        if options.get("audio_drc") and not is_audio_copy:
+            af_filters.append("pan=stereo|FL=0.5*FC+0.707*FL+0.707*BL+0.5*LFE|FR=0.5*FC+0.707*FR+0.707*BR+0.5*LFE")
+            af_filters.append("dynaudnorm")
+            
         if vol != 100 and not is_audio_copy:
             af_filters.append(f"volume={vol/100.0}")
-        if options.get("audio_drc") and not is_audio_copy:
-            af_filters.append("pan=stereo|FL=0.5*FC+0.707*FL+0.707*BL+0.5*LFE|FR=0.5*FC+0.707*FR+0.707*BR+0.5*LFE,dynaudnorm")
 
         # 5. Video Filters
         if options.get("deinterlace"):

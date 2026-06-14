@@ -199,19 +199,33 @@ class MPVPlayerWidget(QWidget):
         if not hasattr(self, 'mpv') or not self.mpv:
             return
 
+        # Congela o volume interno do player em 100% para evitar conflitos, delegando o controle ao lavfi
         self.mpv.volume = 100
-        filters = []
-        if volume_pct != 100:
-            filters.append(f"volume={volume_pct/100.0}")
-        if drc_enabled:
-            filters.append("pan=stereo|FL=0.5*FC+0.707*FL+0.707*BL+0.5*LFE|FR=0.5*FC+0.707*FR+0.707*BR+0.5*LFE,dynaudnorm")
+        
+        lavfi_filters = []
+        
+        # 1. Limpeza de Ruído Neural (Executado no som original)
         if rnnoise_enabled:
             model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "models", "cb.rnnn")
             if os.path.exists(model_path):
                 escaped_model_path = model_path.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
-                filters.append(f"lavfi=[arnndn=m='{escaped_model_path}']")
-        
-        self.mpv.af = ",".join(filters) if filters else ""
+                lavfi_filters.append(f"arnndn=m='{escaped_model_path}'")
+                
+        # 2. Downmix e DRC (Normalização)
+        if drc_enabled:
+            lavfi_filters.append("pan=stereo|FL=0.5*FC+0.707*FL+0.707*BL+0.5*LFE|FR=0.5*FC+0.707*FR+0.707*BR+0.5*LFE")
+            lavfi_filters.append("dynaudnorm")
+            
+        # 3. Ganho final de Volume (Aplicado APÓS a normalização, evitando esmagamento)
+        if volume_pct != 100:
+            lavfi_filters.append(f"volume={volume_pct/100.0}")
+            
+        # Empacota a corrente inteira na sintaxe do libavfilter para o MPV ler e interpretar dinamicamente
+        if lavfi_filters:
+            chain = ",".join(lavfi_filters)
+            self.mpv.af = f"lavfi=[{chain}]"
+        else:
+            self.mpv.af = ""
 
     def __del__(self):
         if hasattr(self, 'mpv') and self.mpv:
