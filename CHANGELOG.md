@@ -11,6 +11,7 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
   * **Flatpak:** O FFmpeg 7.0 agora é compilado nativamente usando os cabeçalhos NVIDIA `n12.1.14.0`.
   * **Debian (.deb):** Usa-se ativamente o pacote oficial `ffmpeg` estável do sistema host via dependência nativa APT.
   * **Windows:** O build passa a baixar o release "Essentials" do repositório Gyan.dev, focado em altíssima estabilidade e retrocompatibilidade do driver da placa de vídeo.
+* **Ordem de Processamento de Áudio (Slider vs DRC) e Preview no MPV:** Corrigida a anomalia visual e auditiva onde o volume parecia não subir adequadamente. O motor FFmpeg foi refatorado para aplicar o Volume *após* a compressão (DRC), impedindo o filtro Inteligente de esmagar o desejo do usuário. Adicionalmente, toda a cadeia de áudio foi encapsulada na sintaxe nativa de ponte `lavfi=[...]` no MPV, restaurando o suporte instantâneo (Real-Time Preview) da Redução Neural de Ruídos e Normalização de Vozes na aba Sincronia.
 ## [1.1.11] - 2026-06-11
 
 ### Adicionado
