@@ -12,6 +12,11 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
   * **Debian (.deb):** Usa-se ativamente o pacote oficial `ffmpeg` estável do sistema host via dependência nativa APT.
   * **Windows:** O build passa a baixar o release "Essentials" do repositório Gyan.dev, focado em altíssima estabilidade e retrocompatibilidade do driver da placa de vídeo.
 * **Ordem de Processamento de Áudio (Slider vs DRC) e Preview no MPV:** Corrigida a anomalia visual e auditiva onde o volume parecia não subir adequadamente. O motor FFmpeg foi refatorado para aplicar o Volume *após* a compressão (DRC), impedindo o filtro Inteligente de esmagar o desejo do usuário. Adicionalmente, toda a cadeia de áudio foi encapsulada na sintaxe nativa de ponte `lavfi=[...]` no MPV, restaurando o suporte instantâneo (Real-Time Preview) da Redução Neural de Ruídos e Normalização de Vozes na aba Sincronia.
+* **Limpeza Universal de Estados Residuais (State Leak):** Resolvido o erro crítico de decodificação (`Encoder not found`) que ocorria ao tentar converter imagens simples (PNG para WEBP) logo após usar perfis pesados de vídeo. A função interna `_reset_advanced_options` foi expandida para varrer e zerar imperativamente absolutamente todas as caixas de seleção, temporizadores de corte e sliders de sincronia/áudio ocultos nas abas Avançadas, impedindo que "estados fantasmas" vazassem de um arquivo para o próximo.
+
+### Modificado (UX)
+* **Design de Navegação de Presets:** O rótulo confuso da combobox de perfis foi renomeado de `"Carregar Preset Salvo..."` para `"🟢 Padrão do Sistema (Automático)"`, informando claramente o usuário sobre o controle delegado ao Lyra.
+* **Botão Dedicado de Limpeza:** Injetado um botão físico `"🔄 Restaurar Padrões"` diretamente na tela principal, permitindo que o usuário dê um Hard Reset instantâneo nas configurações de forma segura.
 ## [1.1.11] - 2026-06-11
 
 ### Adicionado
