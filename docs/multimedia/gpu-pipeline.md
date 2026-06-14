@@ -12,10 +12,11 @@ Codificação via NVENC possui particularidades para manter qualidade equivalent
 - Parâmetros AQ avançados: `-spatial-aq 1`, `-temporal-aq 1`.
 - Aprimoramentos de ref: `-rc-lookahead 32`, `-b_ref_mode 2`.
 
-## 3. Filtros Assistidos por Hardware (CUDA)
-Para maximizar a eficiência, quando a pipeline de GPU está ativa, certos filtros do FFmpeg devem utilizar suas contrapartes otimizadas de CUDA para evitar tráfego desnecessário de frames entre VRAM e RAM:
-- **Escalonamento**: Se houver redimensionamento de vídeo, substitua o filtro `scale` comum por `scale_cuda`. Exigência: cálculos precisos de altura para evitar alturas ímpares.
-- **Desentrelaçamento**: Substitua o `yadif` comum por `yadif_cuda`.
+## 3. Filtros e Fluxo de Memória
+A filosofia original incentivava o uso do `scale_cuda` para redimensionamento. Porém, a compilação cruzada (ex: Flatpak) demonstrou forte quebra nesse filtro sem a presença massiva de bibliotecas LLVM. Portanto, a **nova diretriz arquitetural** determina:
+- **Escalonamento (Resize)**: O uso de `scale_cuda` está DEPRECIADO. Todo redimensionamento deve utilizar o filtro universal `scale`.
+- **Roteamento de Frames**: Para que o `scale` funcione, o frame precisa estar na RAM (CPU). Assim, a flag `-hwaccel_output_format cuda` DEVE ser ejetada da linha de comando dinamicamente sempre que houver manipulação das dimensões do vídeo.
 
-## 4. Cuidados e Fallbacks
-Se opções muito complexas (como legendas embutidas com `-vf subtitles` em hardsub) ou filtros pesados de CPU não-compatíveis com frames `cuda` entrarem no jogo, pode ser necessário remover `-hwaccel_output_format cuda` para forçar a transferência à memória da CPU, ou informar ao usuário incompatibilidades se surgirem no futuro.
+## 4. Cuidados e Fallbacks (Incompatibilidade)
+Se ocorrer filtragem pesada (como legendas embutidas, *cropping* nativo ou escalonamento via software):
+- **Obrigatório**: Remover a restrição de frame formatado (`-hwaccel_output_format cuda`). Isso força a VRAM da GPU a entregar a imagem decodificada de volta para a RAM do host, fazer o filtro matematicamente lá, para então o encoder (`h264_nvenc`) enviar a imagem tratada de volta para a GPU na fase de compactação final.
