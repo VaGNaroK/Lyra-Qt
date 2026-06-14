@@ -8,6 +8,10 @@ O **Lyra Multimedia Converter** é uma interface gráfica (GUI) moderna, modular
 
 ---
 
+> [!TIP]
+> 📖 **É novo por aqui ou não entende muito de vídeos?**  
+> Preparamos um **[Manual do Usuário Passo-a-Passo](MANUAL_DE_USO.md)** super amigável para você aprender a extrair 100% do poder do Lyra!
+
 ## ✨ Principais Recursos
 
 * 🎬 **Conversão Universal:** Suporte nativo para os formatos mais populares do mercado (MP4, MKV, AVI, MP3, OGG, WAV, JPG, PNG, WEBP, entre outros).
