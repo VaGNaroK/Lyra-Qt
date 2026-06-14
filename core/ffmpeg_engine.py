@@ -406,7 +406,10 @@ class FFmpegEngine(QObject):
         if vcodec == "h.265 nvenc": vcodec = "hevc_nvenc"
 
         if not is_image and not is_audio_only and "nvenc" in vcodec:
-            cmd.extend(["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"])
+            cmd.extend(["-hwaccel", "cuda"])
+            size_clean_early = options.get("size", "Original").replace(" ", "")
+            if size_clean_early == "Original":
+                cmd.extend(["-hwaccel_output_format", "cuda"])
 
         # 1.5 Cortes Temporais (Trimming)
         trim_enabled = options.get("trim_enabled", False)
@@ -624,7 +627,7 @@ class FFmpegEngine(QObject):
                     if orig_w > 0 and orig_h > 0:
                         calculated_h = int((target_w * orig_h) / orig_w)
                         target_h = calculated_h + 1 if calculated_h % 2 != 0 else calculated_h
-                    vf_filters.append(f"scale_cuda=w={target_w}:h={target_h}")
+                    vf_filters.append(f"scale={target_w}:{target_h}:flags=lanczos")
                 else:
                     vf_filters.append(f"scale={target_w}:-2:flags=lanczos,setsar=1")
 
