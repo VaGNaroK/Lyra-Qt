@@ -407,8 +407,8 @@ class FFmpegEngine(QObject):
 
         if not is_image and not is_audio_only and "nvenc" in vcodec:
             cmd.extend(["-hwaccel", "cuda"])
-            size_clean_early = options.get("size", "Original").replace(" ", "")
-            if size_clean_early == "Original":
+            vsize_early = options.get("vsize", "default")
+            if vsize_early == "default":
                 cmd.extend(["-hwaccel_output_format", "cuda"])
 
         # 1.5 Cortes Temporais (Trimming)
