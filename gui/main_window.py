@@ -1325,6 +1325,28 @@ class LyraMainWindow(QMainWindow):
         
         self.entry_extra_args.setText("")
         
+        # Fugitivos da Aba Vídeo
+        if hasattr(self, 'combo_video_ratio'):
+            self.combo_video_ratio.blockSignals(True)
+            self.combo_video_ratio.setCurrentIndex(0)
+            self.combo_video_ratio.blockSignals(False)
+        if hasattr(self, 'chk_crf'):
+            self.chk_crf.setChecked(True)
+        if hasattr(self, 'slider_crf'):
+            self.slider_crf.setValue(23)
+        if hasattr(self, 'chk_video_only'):
+            self.chk_video_only.setChecked(False)
+        if hasattr(self, 'chk_bad_index'):
+            self.chk_bad_index.setChecked(False)
+
+        # Fugitivos da Aba Áudio
+        if hasattr(self, 'combo_audio_track'):
+            self.combo_audio_track.blockSignals(True)
+            self.combo_audio_track.setCurrentIndex(0)
+            self.combo_audio_track.blockSignals(False)
+        if hasattr(self, 'list_external_audios'):
+            self.list_external_audios.clear()
+        
         # Aba Imagem
         if hasattr(self, 'combo_img_size'):
             self.combo_img_size.blockSignals(True)
