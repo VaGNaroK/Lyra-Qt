@@ -300,7 +300,7 @@ class LyraMainWindow(QMainWindow):
         self.btn_delete_preset.setEnabled(False)
 
         self.btn_reset_all = QPushButton("🔄 Restaurar Padrões")
-        self.btn_reset_all.clicked.connect(lambda: self.combo_presets.setCurrentIndex(0))
+        self.btn_reset_all.clicked.connect(self._trigger_hard_reset)
 
         format_layout.addWidget(QLabel("📂 Presets:"))
         format_layout.addWidget(self.combo_presets)
@@ -1357,6 +1357,12 @@ class LyraMainWindow(QMainWindow):
             self.time_end.setTime(QTime(0, 0))
 
         self.update_video_codec_ui()
+
+    def _trigger_hard_reset(self):
+        self.combo_presets.blockSignals(True)
+        self.combo_presets.setCurrentIndex(0)
+        self.combo_presets.blockSignals(False)
+        self._reset_advanced_options()
 
     def save_new_preset(self):
         name, ok = QInputDialog.getText(self, "Salvar Preset", "Nome do Preset:")
