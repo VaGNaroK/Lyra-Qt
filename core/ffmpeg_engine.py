@@ -570,6 +570,18 @@ class FFmpegEngine(QObject):
 
         # 6. Build the Final Output Strategy (Image / Audio / Video)
         if is_image:
+            image_codecs = {
+                "webp": "libwebp_anim",
+                "jpg": "mjpeg",
+                "jpeg": "mjpeg",
+                "png": "png",
+                "gif": "gif",
+                "bmp": "bmp",
+                "tiff": "tiff"
+            }
+            if ext_destino in image_codecs:
+                cmd.extend(["-c:v", image_codecs[ext_destino]])
+
             img_size = options.get("img_size", "default")
             if img_size != "default":
                 width = img_size.split(' ')[0].split('x')[0]
