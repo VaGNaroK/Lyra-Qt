@@ -307,6 +307,16 @@ class FFmpegEngine(QObject):
         except (ValueError, TypeError):
             return None
 
+    def is_video_format(self, output_file):
+        """
+        Verifica se a extensão final é um formato de vídeo genuíno 
+        (exclui puramente imagens, áudios e legendas).
+        """
+        ext = os.path.splitext(output_file)[1].lower().replace(".", "")
+        return ext not in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv", 
+                           "mp3", "ogg", "wav", "aac", "flac", "wma", "ac3", "opus", "m4a", 
+                           "srt", "ass", "vtt"]
+
     def start_conversion(self, row, input_file, output_file, duration, options):
         """
         Configura e inicia a conversão de forma assíncrona. Se necessário 2 passos (ex: AV1 pass 1),
@@ -330,7 +340,7 @@ class FFmpegEngine(QObject):
         if vcodec == "h.265 nvenc":
             vcodec = "hevc_nvenc"
 
-        if options.get("two_pass") and vcodec in ["libx264", "libx265"]:
+        if options.get("two_pass") and vcodec in ["libx264", "libx265"] and self.is_video_format(output_file):
             self.current_pass = 1
             log_prefix = os.path.join(tempfile.gettempdir(), f"lyra_passlog_{row}_{int(time.time())}")
             self.current_options["passlog_prefix"] = log_prefix
