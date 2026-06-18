@@ -102,16 +102,27 @@ Dê dois cliques no arquivo Lyra-Qt.flatpak ou instale via terminal:
 
 flatpak install --user Lyra-Qt.flatpak
 
-## ⚠️ Solução de Problemas (Erro de Runtime Ausente):
+## ⚠️ Solução de Problemas Comuns (Flatpak)
 
-Como o pacote standalone não possui acesso à internet para baixar a sua própria base automaticamente, você pode receber o erro: "requer o runtime org.kde.Platform... que não foi localizado".
+### 1. Erro de Runtime Ausente na Instalação
+Como o pacote standalone (`.flatpak`) do Lyra gerado localmente não possui acesso à internet para baixar a sua própria base automaticamente, você pode receber o erro: *"requer o runtime org.kde.Platform... que não foi localizado"*.
 
 **Para corrigir:** Basta instalar a plataforma base do KDE via Flathub antes de instalar o aplicativo:
-
-flatpak remote-add --if-not-exists flathub [https://flathub.org/repo/flathub.flatpakrepo](https://flathub.org/repo/flathub.flatpakrepo)
+```bash
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install flathub org.kde.Platform/x86_64/6.7
-
+```
 > *(Nota: Ajuste a versão `6.7` para a versão exata que o terminal solicitar).*
+
+### 2. Aceleração de Hardware (NVENC/CUDA) Falhando Após Atualizar o Linux
+Se você usa placa de vídeo **NVIDIA**, atualizou o driver recentemente no seu sistema operacional (host) e o Lyra em Flatpak repentinamente começou a exibir o erro **`Cannot load libcuda.so.1`** ou **`Operation not permitted`** ao usar aceleração de hardware:
+
+**Causa:** O ambiente isolado (Sandbox) do Flatpak possui uma cópia exata do driver de vídeo. Quando você atualiza o sistema, essa cópia fica defasada (Mismatch).
+**Para corrigir:** Sempre que você atualizar o driver NVIDIA do seu computador, execute o comando de atualização do Flatpak no terminal para que ele baixe a extensão gráfica mais recente correspondente ao seu sistema:
+```bash
+flatpak update
+```
+*(Nota: Pode levar alguns dias até que novos drivers beta/recém-lançados sejam empacotados pela loja Flathub).*
 
 ---
 

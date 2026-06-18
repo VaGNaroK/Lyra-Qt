@@ -85,6 +85,9 @@ Sim! Na aba "Avançado", na guia de "Legendas e Áudio", você pode adicionar m�
 **3. Marquei H.264 NVENC e recebi uma mensagem vermelha de erro ao iniciar!**
 Isso acontece se o seu computador for antigo ou usar placas da Intel/AMD. O NVENC é exclusivo para placas da NVIDIA. Se não for seu caso, volte para `Padrão (CPU)`.
 
+**4. Atualizei o driver da NVIDIA no meu Linux e agora o Lyra dá o erro "Cannot load libcuda.so.1" ou "Operation not permitted" ao converter!**
+Se você estiver usando a versão **Flatpak** do Lyra, isso acontece porque o ambiente seguro do Flatpak (Sandbox) ainda está usando a cópia da versão antiga do seu driver de vídeo. Para resolver, basta abrir o terminal do Linux e digitar `flatpak update`. O Flatpak vai baixar a extensão gráfica nova correspondente ao seu driver atual e o erro sumirá na hora!
+
 ---
 
 🎉 *Pronto! Você já é um mestre no uso do Lyra Multimedia Converter. Aproveite suas mídias!*
