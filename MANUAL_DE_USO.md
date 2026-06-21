@@ -1,6 +1,6 @@
 # 📖 Manual de Uso: Lyra Multimedia Converter
 
-![Tela Principal do Lyra](manual/main.png)
+![Tela Principal do Lyra](manual/mascot.png)
 
 Bem-vindo ao **Lyra Multimedia Converter**! Este aplicativo foi desenhado para ser uma "fábrica" de mídias no seu computador. Com ele, você pode transformar vídeos enormes em arquivos leves para WhatsApp, isolar a música de um clipe, limpar chiados de gravações de voz ou até baixar conteúdo da internet, tudo com apenas alguns cliques.
 
