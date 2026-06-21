@@ -10,9 +10,9 @@ Se você não tem intimidade com termos de edição de vídeo, não se preocupe:
 
 ## 1. O Básico: Convertendo seu Primeiro Vídeo ou Áudio
 
-A aba principal **"Conversor"** é onde a mágica acontece. O Lyra pode converter tanto Vídeos quanto Áudios.
+Na tela inicial, na opção **"Formato:"**, é onde a mágica acontece escolhendo o tipo de arquivo. O Lyra pode converter tanto Vídeos quanto Áudios.
 
-![Aba de Conversão de Vídeo](manual/videotab.png)
+![Aba de Conversão de Vídeo](manual/main.png)
 
 ### Passo-a-Passo:
 1. **Adicionar Arquivos:** Clique no botão grande `Adicionar Arquivos` (ou arraste seus arquivos de mídia para a janela do aplicativo). Você pode escolher dezenas de vídeos de uma vez.
@@ -50,7 +50,7 @@ A aba **Configurações Avançadas** foi feita para consertar problemas que a ma
 
 ### 🎧 Ferramentas de Áudio
 
-![Aba de Filtros de Áudio](manual/filtertab.png)
+![Aba de Filtros de Áudio](manual/audiotab.png)
 
 Se o áudio do seu vídeo está horrível (muito baixo, estourando ou cheio de chiado do vento), use essas opções:
 * **Normalizar Volume Inteligente (Leveler / DRC):** Você já assistiu a um filme em que as explosões acordam os vizinhos, mas as vozes são tão baixinhas que você não entende nada? Se você ligar essa caixa, o Lyra vira um engenheiro de som: ele levanta o volume das vozes suaves e abaixa o estouro das explosões. Tudo fica no mesmo nível!
