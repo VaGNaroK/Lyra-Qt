@@ -88,6 +88,18 @@ Para gerar um pacote universal isolado (Sandbox) que roda em qualquer distribui�
 
 ## Como compilar (Requer flatpak-builder):
 
+Primeiro, certifique-se de ter o `flatpak-builder` instalado no seu sistema (exemplo para base Debian/Ubuntu ou Mint):
+
+```bash
+sudo apt install flatpak-builder
+```
+
+Se você estiver com o sistema recém-formatado, também precisará instalar o SDK do KDE (ambiente de desenvolvimento) via Flatpak antes de compilar:
+
+```bash
+flatpak install flathub org.kde.Sdk/x86_64/6.8 -y
+```
+
 Compile e exporte para um repositório local (execute estando na pasta raiz do Lyra-Qt):
 
    flatpak-builder --repo=lyra-repo --force-clean diretorio-build build_scripts/com.github.vagnarok.lyra.yml
