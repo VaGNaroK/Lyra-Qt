@@ -1,5 +1,7 @@
 # 📖 Manual de Uso: Lyra Multimedia Converter
 
+![Tela Principal do Lyra](manual/main.png)
+
 Bem-vindo ao **Lyra Multimedia Converter**! Este aplicativo foi desenhado para ser uma "fábrica" de mídias no seu computador. Com ele, você pode transformar vídeos enormes em arquivos leves para WhatsApp, isolar a música de um clipe, limpar chiados de gravações de voz ou até baixar conteúdo da internet, tudo com apenas alguns cliques.
 
 Se você não tem intimidade com termos de edição de vídeo, não se preocupe: este manual foi feito para você.
@@ -9,6 +11,8 @@ Se você não tem intimidade com termos de edição de vídeo, não se preocupe:
 ## 1. O Básico: Convertendo seu Primeiro Vídeo ou Áudio
 
 A aba principal **"Conversor"** é onde a mágica acontece. O Lyra pode converter tanto Vídeos quanto Áudios.
+
+![Aba de Conversão de Vídeo](manual/videotab.png)
 
 ### Passo-a-Passo:
 1. **Adicionar Arquivos:** Clique no botão grande `Adicionar Arquivos` (ou arraste seus arquivos de mídia para a janela do aplicativo). Você pode escolher dezenas de vídeos de uma vez.
@@ -25,6 +29,8 @@ A aba principal **"Conversor"** é onde a mágica acontece. O Lyra pode converte
 ---
 
 ## 2. A Aba de Downloads da Web
+
+![Aba de Download da Web](manual/downloadfromweb.png)
 
 Viu um vídeo ou escutou uma música na internet (como no YouTube) e quer guardar no PC? O Lyra faz isso para você sem precisar instalar sites perigosos.
 
@@ -43,18 +49,27 @@ Viu um vídeo ou escutou uma música na internet (como no YouTube) e quer guarda
 A aba **Configurações Avançadas** foi feita para consertar problemas que a maioria dos outros programas não consegue.
 
 ### 🎧 Ferramentas de Áudio
+
+![Aba de Filtros de Áudio](manual/filtertab.png)
+
 Se o áudio do seu vídeo está horrível (muito baixo, estourando ou cheio de chiado do vento), use essas opções:
 * **Normalizar Volume Inteligente (Leveler / DRC):** Você já assistiu a um filme em que as explosões acordam os vizinhos, mas as vozes são tão baixinhas que você não entende nada? Se você ligar essa caixa, o Lyra vira um engenheiro de som: ele levanta o volume das vozes suaves e abaixa o estouro das explosões. Tudo fica no mesmo nível!
 * **Remover Ruído com IA (RNNN):** Se o seu áudio foi gravado num ventilador ou na rua, ative isso. Uma Inteligência Artificial vai isolar apenas a voz humana e apagar o vento e o chiado.
 * **Preview ao Vivo:** O Lyra tem um player embutido! Clique em `▶ Preview Audio` para abrir o reprodutor. Se você mexer no volume ou ligar o filtro de voz, **você escuta a mudança na mesma hora**, antes mesmo de converter!
 
 ### 💬 Injetando Legendas (Softsub)
+
+![Aba de Legendas](manual/subtab.png)
+
 Tem um arquivo de filme (`.mp4`) e um arquivo de legenda (`.srt`) solto? 
 1. Vá na aba "Legendas e Áudio".
 2. Clique em `Adicionar Legendas` e selecione seus arquivos `.srt`.
 3. Ao converter, as legendas vão para "dentro" do vídeo de forma mágica, podendo ser ativadas ou desativadas na sua TV ou no Netflix.
 
 ### ✂️ Como Cortar um Vídeo (Trimming)
+
+![Aba de Cortes](manual/cuttab.png)
+
 Quer apenas os 10 segundos mais engraçados de um vídeo de 1 hora?
 1. Vá na aba **"Cortes"**.
 2. O player de vídeo vai abrir.
