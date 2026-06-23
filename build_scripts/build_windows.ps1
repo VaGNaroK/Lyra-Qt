@@ -3,6 +3,17 @@ Set-Location -Path "$PSScriptRoot\.."
 
 Write-Host "[*] Preparando ambiente para compilar Lyra-Qt no Windows..." -ForegroundColor Cyan
 
+# 0. Verificar se o Python esta instalado
+Write-Host "[*] Verificando se o Python esta instalado..." -ForegroundColor Yellow
+if (!(Get-Command python -ErrorAction SilentlyContinue)) {
+    Write-Host "[!] ERRO: Python nao foi encontrado no sistema!" -ForegroundColor Red
+    Write-Host "Por favor, baixe e instale a versao mais recente do Python para Windows em: https://www.python.org/downloads/" -ForegroundColor Red
+    Write-Host "IMPORTANTE: Durante a instalacao, certifique-se de marcar a opcao 'Add Python to PATH'." -ForegroundColor Yellow
+    Pause
+    Exit
+}
+Write-Host "[*] Python encontrado!" -ForegroundColor Green
+
 # 1. Criar Ambiente Virtual
 Write-Host "[*] Criando ambiente virtual (venv)..." -ForegroundColor Yellow
 python -m venv venv

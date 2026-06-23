@@ -32,7 +32,7 @@ Na tela inicial, na opção **"Formato:"**, é onde a mágica acontece escolhend
 
 ![Aba de Download da Web](manual/downloadfromweb.png)
 
-Viu um vídeo ou escutou uma música na internet (como no YouTube) e quer guardar no PC? O Lyra faz isso para você sem precisar instalar sites perigosos.
+Viu um vídeo ou escutou uma música na internet (como no YouTube) e quer guardar no PC? O Lyra faz isso para você.
 
 1. Vá na aba lateral **"Baixar Mídia da Web"**.
 2. Cole o **Link/URL** do vídeo na barra de endereço.
@@ -53,16 +53,16 @@ A aba **Configurações Avançadas** foi feita para consertar problemas que a ma
 ![Aba de Filtros de Áudio](manual/audiotab.png)
 
 Se o áudio do seu vídeo está horrível (muito baixo, estourando ou cheio de chiado do vento), use essas opções:
-* **Normalizar Volume Inteligente (Leveler / DRC):** Você já assistiu a um filme em que as explosões acordam os vizinhos, mas as vozes são tão baixinhas que você não entende nada? Se você ligar essa caixa, o Lyra vira um engenheiro de som: ele levanta o volume das vozes suaves e abaixa o estouro das explosões. Tudo fica no mesmo nível!
+* **Normalizar Volume Inteligente (Leveler / DRC):** Você já assistiu a um filme em que as explosões são muito altas, mas as vozes são tão baixinhas que você não entende nada? Se você ligar essa caixa, o Lyra vira um engenheiro de som: ele levanta o volume das vozes suaves e abaixa o estouro das explosões. Tudo fica no mesmo nível!
 * **Remover Ruído com IA (RNNN):** Se o seu áudio foi gravado num ventilador ou na rua, ative isso. Uma Inteligência Artificial vai isolar apenas a voz humana e apagar o vento e o chiado.
-* **Preview ao Vivo:** O Lyra tem um player embutido! Clique em `▶ Preview Audio` para abrir o reprodutor. Se você mexer no volume ou ligar o filtro de voz, **você escuta a mudança na mesma hora**, antes mesmo de converter!
+* **Preview ao Vivo:** O Lyra tem um player embutido! Clique na aba `▶ Sincronia` para abrir o reprodutor. Se você mexer no volume  da aba Áudio ou ligar o filtro de voz, **você escuta a mudança na mesma hora**, antes mesmo de converter!
 
 ### 💬 Injetando Legendas (Softsub)
 
 ![Aba de Legendas](manual/subtab.png)
 
 Tem um arquivo de filme (`.mp4`) e um arquivo de legenda (`.srt`) solto? 
-1. Vá na aba "Legendas e Áudio".
+1. Vá na aba "Legendas".
 2. Clique em `Adicionar Legendas` e selecione seus arquivos `.srt`.
 3. Ao converter, as legendas vão para "dentro" do vídeo de forma mágica, podendo ser ativadas ou desativadas na sua TV ou no Netflix.
 
