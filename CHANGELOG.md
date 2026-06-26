@@ -5,10 +5,10 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 ## [Unreleased]
 
 ### Adicionado
-* **Script Unificado de Compilação (`auto_build.sh`)**: Criado um script interativo único dentro de `build_scripts/` capaz de gerar e instalar pacotes universais (Flatpak) e Debian (.deb) de forma autônoma. O script resolve dependências nativas (flathub/apt), extrai a versão atual de forma dinâmica e questiona o usuário antes de concluir a instalação, unificando todo o ecossistema Linux num só lugar.
+* **Script Unificado de Compilação (`auto_build.sh`)**: Criado um script interativo único dentro de `build_scripts/` capaz de gerar e instalar pacotes universais (Flatpak) e Debian (.deb) de forma autônoma. O script resolve dependências nativas (flathub/apt), extrai a versão atual de forma dinâmica e questiona o usuário antes de concluir a instalação. Ele também integra uma rotina opcional de limpeza profunda de cache de compilação pós-geração do pacote.
 
 ### Removido
-* Removido `package.sh` em favor da unificação de rotinas de empacotamento no novo `auto_build.sh`.
+* Removido `package.sh` e `clean_flatpak_cache.sh` em favor da unificação de rotinas de empacotamento e limpeza no novo `auto_build.sh`.
 
 ## [1.1.12] - 2026-06-13
 

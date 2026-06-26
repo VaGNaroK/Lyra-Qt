@@ -78,6 +78,15 @@ if [ "$OPTION" == "1" ]; then
         echo "✅ Compilação finalizada! O pacote $PACKAGE_NAME está disponível na raiz do projeto."
     fi
 
+    echo "------------------------------------------------------------"
+    echo "Deseja limpar os diretórios de cache da compilação Flatpak? (s/N)"
+    read -p "Opção: " CLEAN_OPT
+    if [[ "$CLEAN_OPT" == "s" || "$CLEAN_OPT" == "S" ]]; then
+        echo "🧹 Limpando cache (.flatpak-builder, diretorio-build, lyra-repo, lyra-package)..."
+        rm -rf .flatpak-builder diretorio-build lyra-repo lyra-package
+        echo "✅ Cache limpo com sucesso."
+    fi
+
 elif [ "$OPTION" == "2" ]; then
     # ==============================================================================
     # 4. COMPILAÇÃO E INSTALAÇÃO: DEBIAN (.DEB)
@@ -176,6 +185,15 @@ EOF
         else
             echo "------------------------------------------------------------"
             echo "✅ Compilação finalizada! O pacote $PACKAGE_NAME está disponível na raiz do projeto."
+        fi
+
+        echo "------------------------------------------------------------"
+        echo "Deseja limpar o diretório de cache da compilação Debian? (s/N)"
+        read -p "Opção: " CLEAN_OPT
+        if [[ "$CLEAN_OPT" == "s" || "$CLEAN_OPT" == "S" ]]; then
+            echo "🧹 Limpando cache ($BUILD_DIR)..."
+            rm -rf "$BUILD_DIR"
+            echo "✅ Cache limpo com sucesso."
         fi
     else
         echo "❌ Erro: O pacote $PACKAGE_NAME não foi encontrado após a compilação."
