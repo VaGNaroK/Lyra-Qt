@@ -80,6 +80,8 @@ class MPVPlayerWidget(QWidget):
     def init_mpv(self):
         import sys
 
+        is_flatpak = "FLATPAK_ID" in os.environ
+
         mpv_opts = {
             'wid': str(int(self.video_widget.winId())),
             'log_handler': print,
@@ -87,16 +89,21 @@ class MPVPlayerWidget(QWidget):
             'input_default_bindings': False, # Impede roubo de atalhos do Qt
             'input_vo_keyboard': False,
             'keep_open': 'yes',
-            'hwdec': 'auto-safe',
+            'hwdec': 'no' if is_flatpak else 'auto-safe',
         }
 
         if sys.platform.startswith('linux'):
             # Silencia os logs diretos de libva (que ignoram o msg_level do MPV e cospem no stderr)
             os.environ['LIBVA_MESSAGING_LEVEL'] = '0'
             
-            mpv_opts['vo'] = 'gpu'
-            mpv_opts['gpu_api'] = 'opengl'
-            mpv_opts['gpu_context'] = 'auto'
+            if is_flatpak:
+                # Fallback seguro para ambientes conteinerizados
+                mpv_opts['vo'] = 'gpu,xv,x11,wayland'
+            else:
+                mpv_opts['vo'] = 'gpu'
+                mpv_opts['gpu_api'] = 'opengl'
+                mpv_opts['gpu_context'] = 'auto'
+                
             mpv_opts['force_window'] = 'no'
             mpv_opts['terminal'] = 'no'
             # Desativa o log verboso de drivers não encontrados (VAAPI) do X11/DRM

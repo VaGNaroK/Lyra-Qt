@@ -2,6 +2,12 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.14] - 2026-06-26
+
+### Corrigido
+* **Travamento do Player no Flatpak (MPV/PipeWire):** Corrigido o congelamento fatal (deadlock) que ocorria na aba de "Sincronia" e "Cortes" ao iniciar o player em pacotes Flatpak. O MPV tentava forçar o carregamento de drivers VA-API (decodificação por hardware) e um contexto puro em OpenGL que muitas vezes estavam restritos pelo sandbox, crachando a UI. O MPV agora roda com `hwdec=no` e VO flexível em Flatpak.
+* **Áudio Mudo no Flatpak:** Adicionado socket nativo do PipeWire (`--filesystem=xdg-run/pipewire-0`) no manifesto YAML, eliminando a falha "Host está desligado" e permitindo que o libmpv comunique corretamente com o servidor de áudio.
+
 ## [1.1.13] - 2026-06-26
 
 ### Adicionado
