@@ -7,6 +7,9 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 ### Adicionado
 * **Script Unificado de Compilação (`auto_build.sh`)**: Criado um script interativo único dentro de `build_scripts/` capaz de gerar e instalar pacotes universais (Flatpak) e Debian (.deb) de forma autônoma. O script resolve dependências nativas (flathub/apt), extrai a versão atual de forma dinâmica e questiona o usuário antes de concluir a instalação. Ele também integra uma rotina opcional de limpeza profunda de cache de compilação pós-geração do pacote.
 
+### Modificado (UX/UI)
+* **Visibilidade de Checkboxes em Tema Dark:** Injetados ícones vetoriais SVG de forma dinâmica via *Stylesheet* global do PySide6. Essa modificação substitui a renderização nativa de checkboxes (`QCheckBox`, `QTableView`, `QListView`), garantindo que itens selecionados ou desmarcados (especialmente nas tabelas de conversão e abas avançadas) fiquem com visibilidade perfeita, eliminando o erro onde checkboxes "desapareciam" no fundo preto.
+
 ### Removido
 * Removido `package.sh` e `clean_flatpak_cache.sh` em favor da unificação de rotinas de empacotamento e limpeza no novo `auto_build.sh`.
 

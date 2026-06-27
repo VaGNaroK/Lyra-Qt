@@ -84,6 +84,25 @@ class LyraMainWindow(QMainWindow):
         self.setup_tray()
         self.center_on_screen()
         self.load_presets()
+        self.apply_checkbox_stylesheet()
+
+    def apply_checkbox_stylesheet(self):
+        chk_checked = os.path.join(self.resource_dir, "assets", "icons", "checkbox_checked.svg").replace("\\", "/")
+        chk_unchecked = os.path.join(self.resource_dir, "assets", "icons", "checkbox_unchecked.svg").replace("\\", "/")
+        
+        checkbox_style = f"""
+        QCheckBox::indicator, QTableView::indicator, QListView::indicator {{
+            width: 18px;
+            height: 18px;
+        }}
+        QCheckBox::indicator:unchecked, QTableView::indicator:unchecked, QListView::indicator:unchecked {{
+            image: url({chk_unchecked});
+        }}
+        QCheckBox::indicator:checked, QTableView::indicator:checked, QListView::indicator:checked {{
+            image: url({chk_checked});
+        }}
+        """
+        self.setStyleSheet(self.styleSheet() + checkbox_style)
 
     def center_on_screen(self):
         """
