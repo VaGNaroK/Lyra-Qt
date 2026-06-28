@@ -61,58 +61,30 @@ Para executar o código-fonte na sua máquina, certifique-se de ter instalado:
 
 O Lyra foi projetado para ser distribuído facilmente. Abaixo estão as instruções detalhadas para empacotar o projeto em diferentes formatos e como instalá-los. Execute os comandos de compilação sempre a partir da raiz do projeto.
 
-## 🐧Linux: Pacote Debian (.deb) para Ubuntu/Mint/Debian
+## 🐧 Linux: Pacotes Debian (.deb) e Universal (Flatpak)
 
-O script package.sh extrai a versão atual diretamente do código, estrutura os diretórios do sistema e gera o instalador.
+O Lyra-Qt possui um script unificado (`auto_build.sh`) que extrai a versão atual do código, resolve as dependências do sistema (como `flatpak-builder` e SDKs do KDE), estrutura os diretórios, compila e gera o instalador (.deb ou .flatpak) automaticamente.
 
-## Como compilar:
+### Como compilar e instalar:
 
-Conceda permissão de execução ao script:
-
-   chmod +x package.sh
-
-## Execute o script:
-
-Bash
-   ./package.sh
-
-## Como instalar:
-
-Após a compilação, o pacote .deb estará na raiz do projeto. Para instalá-lo, utilize o apt (que resolve automaticamente dependências do sistema, se houver):
-
-sudo apt install ./lyra-*.deb
-
-## 📦 Linux: Pacote Universal (Flatpak Standalone)
-
-Para gerar um pacote universal isolado (Sandbox) que roda em qualquer distribuição Linux, utilizaremos o manifesto YAML do projeto.
-
-## Como compilar (Requer flatpak-builder):
-
-Primeiro, certifique-se de ter o `flatpak-builder` instalado no seu sistema (exemplo para base Debian/Ubuntu ou Mint):
+Conceda permissão de execução ao script (necessário apenas na primeira vez):
 
 ```bash
-sudo apt install flatpak-builder
+chmod +x build_scripts/auto_build.sh
 ```
 
-Se você estiver com o sistema recém-formatado, também precisará instalar o SDK do KDE (ambiente de desenvolvimento) via Flatpak antes de compilar:
+Execute o script interativo:
 
 ```bash
-flatpak install flathub org.kde.Sdk/x86_64/6.8 -y
+./build_scripts/auto_build.sh
 ```
 
-Compile e exporte para um repositório local (execute estando na pasta raiz do Lyra-Qt):
+O script perguntará:
+1. Qual formato você deseja gerar (`1` para Flatpak ou `2` para Debian .deb).
+2. Se você deseja realizar a instalação automática no sistema após a compilação.
+3. (Apenas no Flatpak) Se a instalação deve ser feita para o usuário atual (`user`) ou para todos (`system`).
 
-   flatpak-builder --repo=lyra-repo --force-clean diretorio-build build_scripts/com.github.vagnarok.lyra.yml
-
-Gere o arquivo instalável .flatpak (Bundle):
-
-   flatpak build-bundle lyra-repo Lyra-Qt.flatpak com.github.vagnarok.lyra stable
-
-## Como instalar:
-
-Dê dois cliques no arquivo Lyra-Qt.flatpak ou instale via terminal:
-
-flatpak install --user Lyra-Qt.flatpak
+Ao final do processo, caso você escolha não instalar automaticamente, o pacote final (`.deb` ou `.flatpak`) será gerado na pasta raiz do projeto.
 
 ## ⚠️ Solução de Problemas Comuns (Flatpak)
 
