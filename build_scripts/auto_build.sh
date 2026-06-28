@@ -31,7 +31,8 @@ echo "------------------------------------------------------------"
 echo "Escolha o formato de pacote que deseja gerar e instalar:"
 echo "1) 📦 Pacote Universal (Flatpak Standalone)"
 echo "2) 📦 Pacote Debian (.deb) para Ubuntu/Mint/Debian"
-read -p "Digite a opção (1 ou 2): " OPTION
+echo "3) 🧹 Apenas Limpar Caches de Compilação"
+read -p "Digite a opção (1, 2 ou 3): " OPTION
 echo "------------------------------------------------------------"
 
 if [ "$OPTION" == "1" ]; then
@@ -198,6 +199,18 @@ EOF
     else
         echo "❌ Erro: O pacote $PACKAGE_NAME não foi encontrado após a compilação."
         exit 1
+    fi
+elif [ "$OPTION" == "3" ]; then
+    # ==============================================================================
+    # 5. APENAS LIMPEZA DE CACHE
+    # ==============================================================================
+    echo "🔍 Verificando pastas de cache do Flatpak e Debian..."
+    if [ -d ".flatpak-builder" ] || [ -d "diretorio-build" ] || [ -d "lyra-repo" ] || [ -d "lyra-package" ]; then
+        echo "🧹 Apagando caches (.flatpak-builder, diretorio-build, lyra-repo, lyra-package)..."
+        rm -rf .flatpak-builder diretorio-build lyra-repo lyra-package
+        echo "✅ Caches de compilação limpos com sucesso!"
+    else
+        echo "✨ Nenhum cache encontrado. O diretório do projeto já está limpo."
     fi
 else
     echo "❌ Opção inválida. Saindo do script."
