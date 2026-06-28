@@ -99,6 +99,7 @@ class MPVPlayerWidget(QWidget):
             if is_flatpak:
                 # Fallback seguro para ambientes conteinerizados
                 mpv_opts['vo'] = 'gpu,xv,x11,wayland'
+                mpv_opts['ao'] = 'pulse'
             else:
                 mpv_opts['vo'] = 'gpu'
                 mpv_opts['gpu_api'] = 'opengl'
