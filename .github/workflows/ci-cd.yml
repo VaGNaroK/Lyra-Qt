@@ -28,11 +28,15 @@ jobs:
         run: |
           .\build_scripts\build_windows.ps1
 
+      - name: Zip Windows Build
+        shell: powershell
+        run: Compress-Archive -Path dist\Lyra-Qt -DestinationPath dist\Lyra-Qt-Windows.zip
+
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: dist/Lyra-Qt
+          path: dist/Lyra-Qt-Windows.zip
 
   build-linux-deb:
     name: Build Linux (.deb)
