@@ -9,7 +9,7 @@ if (!(Get-Command python -ErrorAction SilentlyContinue)) {
     Write-Host "[!] ERRO: Python nao foi encontrado no sistema!" -ForegroundColor Red
     Write-Host "Por favor, baixe e instale a versao mais recente do Python para Windows em: https://www.python.org/downloads/" -ForegroundColor Red
     Write-Host "IMPORTANTE: Durante a instalacao, certifique-se de marcar a opcao 'Add Python to PATH'." -ForegroundColor Yellow
-    Pause
+    if (-not $env:CI) { Pause }
     Exit
 }
 Write-Host "[*] Python encontrado!" -ForegroundColor Green
@@ -66,4 +66,4 @@ Write-Host "[*] Iniciando PyInstaller..." -ForegroundColor Cyan
 
 Write-Host "[*] Compilacao concluida com sucesso!" -ForegroundColor Green
 Write-Host "[*] O seu aplicativo pronto esta dentro da pasta 'dist\Lyra-Qt'." -ForegroundColor Green
-Pause
+if (-not $env:CI) { Pause }
