@@ -41,6 +41,7 @@ class LyraMainWindow(QMainWindow):
         self.setWindowTitle(f"Lyra Multimedia Converter v{version}")
         self.resize(1024, 650)
         self.setMinimumSize(850, 550)
+        self.setAcceptDrops(True)
 
         self.version = version
         self.resource_dir = resource_dir or os.path.dirname(os.path.abspath(__file__))
@@ -184,6 +185,10 @@ class LyraMainWindow(QMainWindow):
         Intercepta o fechamento da janela. Se houver downloads ou conversões ocorrendo,
         pergunta ao usuário se ele realmente quer abortar tudo.
         """
+        if getattr(self, '_force_quitting', False):
+            event.accept()
+            return
+            
         if self.tray_available:
             event.ignore()
             self.hide()
@@ -213,8 +218,9 @@ class LyraMainWindow(QMainWindow):
 
     def force_quit(self):
         if self.is_converting or self.is_downloading:
+            # Parente None para não forçar o 'show()' automático da janela oculta pelo Qt
             resposta = QMessageBox.question(
-                self, "Aviso",
+                None, "Aviso",
                 "Há uma tarefa em andamento. Deseja forçar o encerramento?",
                 QMessageBox.Yes | QMessageBox.No
             )
@@ -222,9 +228,11 @@ class LyraMainWindow(QMainWindow):
                 self.engine.stop_all()
                 self.ytdlp_engine.stop()
                 self._shutdown_mpv()
+                self._force_quitting = True
                 QApplication.instance().quit()
         else:
             self._shutdown_mpv()
+            self._force_quitting = True
             QApplication.instance().quit()
 
     def _shutdown_mpv(self):
@@ -1172,6 +1180,17 @@ class LyraMainWindow(QMainWindow):
 
     def start_conversion_queue(self):
         if self.is_converting or self.table_files.rowCount() == 0: return
+        
+        # Reseta o status de arquivos marcados que já foram concluídos ou deram erro
+        for row in range(self.table_files.rowCount()):
+            if self.table_files.item(row, 0).checkState() == Qt.Checked:
+                current_status = self.table_files.item(row, 7).text()
+                if current_status in ("Concluído", "Erro"):
+                    self.table_files.item(row, 7).setText("Pronto")
+                    self.table_files.item(row, 4).setText("--")
+                    self.table_files.item(row, 5).setText("--:--:--")
+                    self.table_files.item(row, 6).setText("--:--:--")
+
         self.is_converting = True
         self.btn_convert.setEnabled(False)
         self.btn_stop.setEnabled(True)
@@ -1203,6 +1222,23 @@ class LyraMainWindow(QMainWindow):
         input_file = self.table_files.item(row_to_process, 1).toolTip()
         duration = float(self.table_files.item(row_to_process, 3).toolTip())
         output_file = os.path.join(self.lbl_dest_path.text(), f"{os.path.splitext(os.path.basename(input_file))[0]}.{self.combo_format.currentText().lower()}")
+
+        if os.path.exists(output_file):
+            action = self.combo_exist_action.currentText()
+            if action == "Pular conversão":
+                self.table_files.setItem(row_to_process, 7, QTableWidgetItem("Pulado"))
+                self.text_log.appendPlainText(f"\n[Aviso] O arquivo '{os.path.basename(output_file)}' já existe. Pulando conversão...\n")
+                # Usa um pequeno delay para não travar a UI caso muitos sejam pulados sequencialmente
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(100, self.process_next_file)
+                return
+            elif action == "Escolher outro nome":
+                base, ext = os.path.splitext(output_file)
+                counter = 1
+                while os.path.exists(output_file):
+                    output_file = f"{base}_{counter}{ext}"
+                    counter += 1
+            # Se for "Sobrescrever", segue normalmente, pois o FFmpeg_engine já passa a flag '-y'.
 
         self.table_files.setItem(row_to_process, 7, QTableWidgetItem("Processando..."))
         self.engine.start_conversion(row_to_process, input_file, output_file, duration, self.get_ui_options())
@@ -1479,3 +1515,20 @@ class LyraMainWindow(QMainWindow):
         self.btn_start_dl.setEnabled(True)
         self.btn_stop_dl.setEnabled(False)
         self.dl_log.appendPlainText(f"\n❌ Erro crítico: Falha ao iniciar o motor de download ({error}).")
+
+    # ======================================================================
+    # DRAG AND DROP EVENTS
+    # ======================================================================
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if os.path.isfile(file_path):
+                self.add_file_to_table(file_path)
+            elif os.path.isdir(file_path):
+                for root, _, files in os.walk(file_path):
+                    for file in files:
+                        self.add_file_to_table(os.path.join(root, file))

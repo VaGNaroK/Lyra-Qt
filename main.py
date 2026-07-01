@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 # 🔒 ÚNICA FONTE DA VERDADE (Single Source of Truth)
 # O package.sh faz grep '^__version__' para extrair este valor.
 # ==============================================================================
-__version__ = "1.1.14"
+__version__ = "1.1.15"
 
 # ==============================================================================
 # 🔒 DETECÇÃO DE AMBIENTE FLATPAK

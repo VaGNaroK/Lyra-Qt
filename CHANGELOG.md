@@ -2,6 +2,18 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.15] - 2026-06-30
+
+### Adicionado
+* **Drag & Drop Nativo:** Suporte completo para arrastar e soltar arquivos de mídia e pastas inteiras diretamente na janela principal para adicioná-los à fila de conversão.
+* **Resolução de Conflito de Arquivos (Existentes):** Implementada a lógica funcional para o menu de destino (Sobrescrever, Escolher outro nome, Pular conversão). O Lyra agora respeita a escolha do usuário e checa se o arquivo de saída já existe antes de enviar para o FFmpeg (anteriormente a flag `-y` era forçada globalmente).
+
+### Corrigido
+* **Reaproveitamento na Fila de Conversão:** O app agora redefine o status de arquivos com estado "Concluído" ou "Erro" de volta para "Pronto" se eles continuarem marcados na fila e você clicar em "Converter". Isso permite reconversão instantânea (com outros presets) sem a necessidade de remover e adicionar o vídeo novamente.
+* **Encerramento Fantasma via System Tray:** Corrigido o erro crônico que mantinha o app rodando oculto no background após clicar em "Sair" pela bandeja do sistema. O evento de encerramento (`closeEvent`) agora aceita a morte do processo com sucesso.
+* **Janela Principal Surgindo do Nada:** A tela principal não volta mais subitamente ao centro da tela no Windows quando o aviso de encerramento forçado do Tray é acionado (o parentesco do QMessageBox foi neutralizado).
+* **Bug de Importação do PySide6:** Corrigido um import isolado que poderia acionar bibliotecas do PyQt5 e crashar a interface ao tentar pular uma conversão.
+
 ## [1.1.14] - 2026-06-26
 
 ### Corrigido
