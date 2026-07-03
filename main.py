@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 # 🔒 ÚNICA FONTE DA VERDADE (Single Source of Truth)
 # O package.sh faz grep '^__version__' para extrair este valor.
 # ==============================================================================
-__version__ = "1.1.15"
+__version__ = "1.1.16"
 
 # ==============================================================================
 # 🔒 DETECÇÃO DE AMBIENTE FLATPAK
@@ -39,6 +39,12 @@ RESOURCE_DIR = _resolve_resource_dir()
 assets_bin_path = os.path.join(RESOURCE_DIR, "assets", "bin")
 if os.path.exists(assets_bin_path):
     os.environ["PATH"] = assets_bin_path + os.pathsep + os.environ.get("PATH", "")
+    # Em Python 3.8+ no Windows, é necessário usar add_dll_directory para que o ctypes encontre as dependências da DLL
+    if hasattr(os, 'add_dll_directory'):
+        try:
+            os.add_dll_directory(assets_bin_path)
+        except Exception:
+            pass
 
 # Importação segura da GUI
 try:

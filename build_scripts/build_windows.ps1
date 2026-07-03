@@ -61,7 +61,7 @@ Write-Host "[*] Iniciando PyInstaller..." -ForegroundColor Cyan
     --add-data "assets\bin\ffmpeg.exe;assets\bin" `
     --add-data "assets\bin\ffprobe.exe;assets\bin" `
     --add-data "assets\bin\yt-dlp.exe;assets\bin" `
-    --add-data "assets\bin\mpv-2.dll;assets\bin" `
+    --add-binary "assets\bin\mpv-2.dll;assets\bin" `
     main.py
 
 Write-Host "[*] Compilacao concluida com sucesso!" -ForegroundColor Green
