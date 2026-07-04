@@ -64,6 +64,18 @@ Write-Host "[*] Iniciando PyInstaller..." -ForegroundColor Cyan
     --add-binary "assets\bin\mpv-2.dll;assets\bin" `
     main.py
 
+Write-Host "[*] Extraindo versao do main.py..." -ForegroundColor Cyan
+$versionLine = Get-Content -Path "main.py" | Where-Object { $_ -match '^__version__\s*=\s*"([^"]+)"' } | Select-Object -First 1
+$version = "unknown"
+if ($versionLine -match '^__version__\s*=\s*"([^"]+)"') {
+    $version = $matches[1]
+}
+
+$zipName = "Lyra-Qt-Windows-v$version.zip"
+Write-Host "[*] Compactando pasta dist\Lyra-Qt para $zipName..." -ForegroundColor Yellow
+if (Test-Path $zipName) { Remove-Item $zipName -Force }
+Compress-Archive -Path "dist\Lyra-Qt" -DestinationPath $zipName -Force
+
 Write-Host "[*] Compilacao concluida com sucesso!" -ForegroundColor Green
-Write-Host "[*] O seu aplicativo pronto esta dentro da pasta 'dist\Lyra-Qt'." -ForegroundColor Green
+Write-Host "[*] O seu aplicativo pronto esta no arquivo '$zipName'." -ForegroundColor Green
 if (-not $env:CI) { Pause }
