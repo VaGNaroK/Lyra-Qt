@@ -202,15 +202,27 @@ EOF
     fi
 elif [ "$OPTION" == "3" ]; then
     # ==============================================================================
-    # 5. APENAS LIMPEZA DE CACHE
+    # 5. APENAS LIMPEZA DE CACHE E PACOTES
     # ==============================================================================
-    echo "🔍 Verificando pastas de cache do Flatpak e Debian..."
+    echo "🔍 Verificando pastas de cache e pacotes compilados na raiz..."
+    
+    FOUND_CACHE=false
     if [ -d ".flatpak-builder" ] || [ -d "diretorio-build" ] || [ -d "lyra-repo" ] || [ -d "lyra-package" ]; then
-        echo "🧹 Apagando caches (.flatpak-builder, diretorio-build, lyra-repo, lyra-package)..."
+        FOUND_CACHE=true
+        echo "🧹 Apagando pastas de cache (.flatpak-builder, diretorio-build, lyra-repo, lyra-package)..."
         rm -rf .flatpak-builder diretorio-build lyra-repo lyra-package
-        echo "✅ Caches de compilação limpos com sucesso!"
+    fi
+    
+    if ls *.flatpak *.deb 1> /dev/null 2>&1; then
+        FOUND_CACHE=true
+        echo "🧹 Apagando pacotes compilados (*.flatpak, *.deb)..."
+        rm -f *.flatpak *.deb
+    fi
+
+    if [ "$FOUND_CACHE" = true ]; then
+        echo "✅ Limpeza concluída com sucesso!"
     else
-        echo "✨ Nenhum cache encontrado. O diretório do projeto já está limpo."
+        echo "✨ Nenhum cache ou pacote encontrado. O diretório do projeto já está limpo."
     fi
 else
     echo "❌ Opção inválida. Saindo do script."

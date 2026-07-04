@@ -414,6 +414,15 @@ class FFmpegEngine(QObject):
 
         vcodec = options.get("vcodec", "default")
         if vcodec == "h.265 nvenc": vcodec = "hevc_nvenc"
+        if vcodec == "libvpx-vp8": vcodec = "libvpx"
+        
+        if ext_destino in ["mp4", "avi"]:
+            if vcodec in ["libvpx-vp9", "libvpx"]:
+                vcodec = "default"
+                self.log_updated.emit(f"⚠️ Aviso de Blindagem: O formato {ext_destino.upper()} não é compatível com o codec VP8/VP9. Alterado para padrão (H.264).\n")
+            if options.get("acodec") == "libopus":
+                options["acodec"] = "default"
+                self.log_updated.emit(f"⚠️ Aviso de Blindagem: O formato {ext_destino.upper()} não suporta perfeitamente o codec OPUS. Alterado para padrão (AAC).\n")
 
         if not is_image and not is_audio_only and "nvenc" in vcodec:
             cmd.extend(["-hwaccel", "cuda"])
@@ -495,17 +504,17 @@ class FFmpegEngine(QObject):
             
         # Força o codec de legenda compatível com o contêiner
         if not is_audio_only and not is_image:
-            cmd.extend(["-c:s", "mov_text" if ext_destino == "mp4" else ("copy" if ext_destino == "mkv" else "srt")])
+            cmd.extend(["-c:s", "mov_text" if ext_destino == "mp4" else ("copy" if ext_destino == "mkv" else ("webvtt" if ext_destino == "webm" else "srt"))])
 
         # 4. Audio Filters
         audio_offset_ms = options.get("audio_offset_ms", 0)
         if audio_offset_ms != 0 and options.get("acodec", "default") == "copy":
-            options["acodec"] = "aac" if ext_destino == "mp4" else "default"
+            options["acodec"] = "aac" if ext_destino == "mp4" else ("libopus" if ext_destino == "webm" else "default")
             self.log_updated.emit("⚠️ Sincronia de Áudio ativada: O áudio não pode ser 'copy'. Alterado para recodificação.\n")
             
         noise_reduction = options.get("noise_reduction", False)
         if noise_reduction and options.get("acodec", "default") == "copy":
-            options["acodec"] = "aac" if ext_destino == "mp4" else "default"
+            options["acodec"] = "aac" if ext_destino == "mp4" else ("libopus" if ext_destino == "webm" else "default")
             self.log_updated.emit("⚠️ Redução de Ruído ativada: O áudio não pode ser 'copy'. Alterado para recodificação.\n")
             
         is_audio_copy = (options.get("acodec", "default") == "copy")

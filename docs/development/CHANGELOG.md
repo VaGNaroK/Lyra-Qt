@@ -1,3 +1,0 @@
-- Nova funcionalidade AV1
-- Novo tema escuro
-- Nova tela de exportação

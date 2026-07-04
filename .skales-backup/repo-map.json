@@ -1,0 +1,102 @@
+{
+  "entries": [
+    {
+      "relPath": "core/ffmpeg_engine.py",
+      "language": "py",
+      "symbols": [
+        "FFmpegEngine"
+      ],
+      "imports": [
+        "os",
+        "re",
+        "time",
+        "subprocess",
+        "tempfile",
+        "json",
+        "PySide6.QtCore"
+      ]
+    },
+    {
+      "relPath": "core/preset_manager.py",
+      "language": "py",
+      "symbols": [
+        "PresetManager"
+      ],
+      "imports": [
+        "os",
+        "json"
+      ]
+    },
+    {
+      "relPath": "core/utils.py",
+      "language": "py",
+      "symbols": [
+        "normalize_bitrate"
+      ],
+      "imports": []
+    },
+    {
+      "relPath": "core/ytdlp_engine.py",
+      "language": "py",
+      "symbols": [
+        "YTDLPEngine"
+      ],
+      "imports": [
+        "sys",
+        "os",
+        "PySide6.QtCore"
+      ]
+    },
+    {
+      "relPath": "gui/main_window.py",
+      "language": "py",
+      "symbols": [
+        "LyraMainWindow"
+      ],
+      "imports": [
+        "sys",
+        "os",
+        "subprocess",
+        "PySide6.QtWidgets",
+        "PySide6.QtGui",
+        "PySide6.QtCore",
+        "PySide6.QtMultimedia",
+        "gui.mpv_widget"
+      ]
+    },
+    {
+      "relPath": "gui/mpv_widget.py",
+      "language": "py",
+      "symbols": [
+        "format_time",
+        "MPVPlayerWidget"
+      ],
+      "imports": [
+        "os",
+        "locale",
+        "mpv",
+        "PySide6.QtWidgets",
+        "PySide6.QtCore"
+      ]
+    },
+    {
+      "relPath": "main.py",
+      "language": "py",
+      "symbols": [
+        "_resolve_resource_dir"
+      ],
+      "imports": [
+        "sys",
+        "os",
+        "PySide6.QtWidgets",
+        "PySide6.QtGui",
+        "PySide6.QtCore"
+      ]
+    }
+  ],
+  "totalFiles": 11,
+  "indexedFiles": 7,
+  "method": "regex",
+  "generatedAt": 1783122339429,
+  "merkleRoot": "be0938d43227c96f19adb3733655e0f203d8b53e7f7cea9d34c2dc8ad3a7d381"
+}

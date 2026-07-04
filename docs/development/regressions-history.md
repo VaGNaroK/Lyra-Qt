@@ -68,3 +68,28 @@ Este documento acompanha bugs e regressões resolvidos ao longo do projeto, para
 - **Problema**: Após a blindagem do motor (`is_image`), as extensões de saída de imagem foram proibidas de usar codecs de vídeo da UI. Isso delegou ao FFmpeg a "Auto-Seleção" baseada na extensão final. Em alguns binários (como o do Flatpak), o default interno para `.webp` estava desabilitado, resultando em quebra imediata por falta de codec. Adicionalmente, forçar um encoder simples (`libwebp`) causaria a destruição de animações GIF para WebP.
 - **Sintoma**: "Encoder not found" ao converter qualquer imagem para `.webp`.
 - **Fix (🔒)**: A arquitetura de `is_image` foi refatorada. Em vez de depender do livre-arbítrio da compilação do FFmpeg do host, o aplicativo possui agora um **Dicionário Rígido de Codecs de Imagem**. Ele passa forçosamente o codec exato de acordo com a extensão (`mjpeg` para JPG, `libwebp_anim` para WEBP estáticos e animados, `png`, `gif`, `bmp`, `tiff`). O erro de dependência cega foi extirpado.
+
+## 15. Áudio Mudo e Travamento do MPV no Sandbox (Flatpak)
+- **Problema**: No ambiente Flatpak, o MPV Player iniciava mudo com o erro "Host is down" (sem permissões de socket de áudio) ou congelava inteiramente (Deadlock) na aba de Sincronia, tentando forçar aceleração por hardware (VA-API) ou contextos OpenGL puros sem sucesso.
+- **Sintoma**: O reprodutor de pré-visualização crachava a interface inteira ao abrir ou não emitia som algum.
+- **Fix (🔒)**: No manifesto YAML do Flatpak, foi inserida a permissão explícita `--filesystem=xdg-run/pipewire-0` para acesso ao áudio, e o código do player passou a declarar o fallback `ao=pulse`. O contexto de renderização do `mpv` foi estabilizado forçando `hwdec=no` e desacoplando a amarra do OpenGL puro em favor do renderizador XWayland flexível na sandbox.
+
+## 16. Encerramento Fantasma pelo System Tray (App Zombie)
+- **Problema**: O clique em "Sair" através do ícone da bandeja emitia o comando de finalização `QApplication.quit()`, o que engatilhava o `closeEvent` da janela. Porém, o `closeEvent` estava interceptando e cancelando o encerramento para apenas esconder a janela na bandeja, criando um loop morto infinito.
+- **Sintoma**: A janela sumia, mas o processo `python3 main.py` continuava rodando secretamente no gerenciador de tarefas para sempre.
+- **Fix (🔒)**: Injetada uma flag lógica `_force_quitting = True` antes de disparar o `quit()`. O `closeEvent` agora checa essa flag; se for verdadeira, ele faz o Bypass do cancelamento e permite que o evento de destruição (Accept) finalize o app limpamente.
+
+## 17. Conflito Parental de Mensagens (Janela Surgindo Abruptamente)
+- **Problema**: No Windows, ao gerar uma caixa de diálogo (`QMessageBox`) atrelada à Janela Principal (`parent=self`) durante o fechamento pelo Tray, o ambiente gráfico do SO automaticamente forçava a janela principal a se "desocultar" e reaparecer no centro da tela.
+- **Sintoma**: Clicar com botão direito na bandeja e pedir para sair fazia o aplicativo dar um pulo assustador para o meio da tela.
+- **Fix (🔒)**: O parentesco do `QMessageBox` na função de encerramento pelo tray foi desvinculado (`parent=None`), impedindo o sistema operacional de puxar a árvore hierárquica e forçar o *un-hide* da tela de fundo.
+
+## 18. Interface Engessada em Arquivos Finalizados
+- **Problema**: A fila de conversão aplicava o estado "Concluído" ou "Erro" de forma permanente a um item, exigindo que o usuário usasse os botões "Remover" e depois "Adicionar" se quisesse converter o mesmo vídeo novamente para outro formato.
+- **Sintoma**: Tentar converter o mesmo vídeo duas vezes exigia intervenção braçal repetitiva do usuário.
+- **Fix (🔒)**: Adicionada rotina na verificação de fila: antes de iniciar o loop, itens marcados na fila que possuam status `Concluído` ou `Erro` são automaticamente revertidos para o estado verde e neutro `Pronto`, permitindo re-conversões instantâneas.
+
+## 19. Bug Crítico de Lógica Visual (Arquivos Existentes vs FFmpeg)
+- **Problema**: A combobox de destino (Pular, Renomear, Sobrescrever) era apenas estética. No motor real de processamento, a flag `-y` (Overwrite) era passada incondicionalmente ao FFmpeg, esmagando arquivos de usuários sem dó e ignorando a escolha visual.
+- **Sintoma**: Não importava o que o usuário escolhia, o arquivo original era destruído e o FFmpeg sempre sobrescrevia.
+- **Fix (🔒)**: Implementada checagem via `os.path.exists()` na função `process_next_file`. A lógica de Pular (`continue` no loop de fila), Renomear (Loop iterativo gerando `arquivo_1.mp4`, `arquivo_2.mp4`) e Sobrescrever (manter `-y`) foi injetada no código *antes* de delegar a tarefa aos Motores de FFmpeg.

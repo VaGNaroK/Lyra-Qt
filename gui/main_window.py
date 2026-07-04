@@ -97,10 +97,10 @@ class LyraMainWindow(QMainWindow):
             height: 18px;
         }}
         QCheckBox::indicator:unchecked, QTableView::indicator:unchecked, QListView::indicator:unchecked {{
-            image: url({chk_unchecked});
+            image: url("{chk_unchecked}");
         }}
         QCheckBox::indicator:checked, QTableView::indicator:checked, QListView::indicator:checked {{
-            image: url({chk_checked});
+            image: url("{chk_checked}");
         }}
         """
         self.setStyleSheet(self.styleSheet() + checkbox_style)
@@ -310,7 +310,7 @@ class LyraMainWindow(QMainWindow):
 
         format_layout = QHBoxLayout()
         self.combo_format = QComboBox()
-        self.combo_format.addItems(["MP4", "MKV", "AVI", "MP3", "OGG", "WAV", "JPG", "PNG", "GIF", "BMP", "WEBP", "SRT"])
+        self.combo_format.addItems(["MP4", "MKV", "WEBM", "AVI", "MP3", "OGG", "OPUS", "WAV", "JPG", "PNG", "GIF", "BMP", "WEBP", "SRT"])
         self.combo_format.setMinimumWidth(150)
         format_layout.addWidget(QLabel("🎬 Formato:"))
         format_layout.addWidget(self.combo_format)
@@ -399,6 +399,9 @@ class LyraMainWindow(QMainWindow):
         self.create_more_tab()
         self.create_info_tab()
         self.create_log_tab()
+        
+        self.combo_format.currentTextChanged.connect(self.update_format_locks)
+        self.update_format_locks()
         advanced_layout.addWidget(self.tab_widget)
         self.stacked_widget.addWidget(self.advanced_page)
 
@@ -655,7 +658,7 @@ class LyraMainWindow(QMainWindow):
         layout = QFormLayout(tab)
         
         self.combo_video_codec = QComboBox()
-        self.combo_video_codec.addItems(["default", "copy", "libx264", "libx265", "h264_nvenc", "h.265 nvenc", "mpeg4"])
+        self.combo_video_codec.addItems(["default", "copy", "libx264", "libx265", "h264_nvenc", "h.265 nvenc", "mpeg4", "libvpx-vp9", "libvpx-vp8"])
 
         self.chk_crf = QCheckBox("Usar Qualidade Inteligente (CRF / CQ)")
         self.chk_crf.setChecked(True)
@@ -733,6 +736,30 @@ class LyraMainWindow(QMainWindow):
         else:
             self.chk_2pass.setChecked(False)
             self.chk_2pass.setEnabled(False)
+
+    def update_format_locks(self):
+        if not hasattr(self, 'combo_video_codec') or not hasattr(self, 'combo_audio_codec'):
+            return
+        fmt = self.combo_format.currentText().upper()
+        restrict = fmt in ["MP4", "AVI"]
+        
+        v_model = self.combo_video_codec.model()
+        for i in range(self.combo_video_codec.count()):
+            if self.combo_video_codec.itemText(i) in ["libvpx-vp9", "libvpx-vp8"]:
+                item = v_model.item(i)
+                if item:
+                    item.setEnabled(not restrict)
+                    if restrict and self.combo_video_codec.currentIndex() == i:
+                        self.combo_video_codec.setCurrentIndex(0)
+                        
+        a_model = self.combo_audio_codec.model()
+        for i in range(self.combo_audio_codec.count()):
+            if self.combo_audio_codec.itemText(i) == "libopus":
+                item = a_model.item(i)
+                if item:
+                    item.setEnabled(not restrict)
+                    if restrict and self.combo_audio_codec.currentIndex() == i:
+                        self.combo_audio_codec.setCurrentIndex(0)
 
     def create_image_tab(self):
         tab = QWidget()
@@ -825,8 +852,7 @@ class LyraMainWindow(QMainWindow):
     def browse_subtitle(self):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Selecionar Legendas", os.path.expanduser("~"),
-            "Arquivos de Legenda (*.srt *.ass *.vtt);;Todos os Arquivos (*.*)",
-            options=QFileDialog.DontUseNativeDialog
+            "Arquivos de Legenda (*.srt *.ass *.vtt);;Todos os Arquivos (*.*)"
         )
         if paths:
             for path in paths:
@@ -835,8 +861,7 @@ class LyraMainWindow(QMainWindow):
     def browse_audio(self):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Selecionar Áudios", os.path.expanduser("~"),
-            "Arquivos de Áudio (*.mp3 *.wav *.aac *.flac *.ogg *.m4a);;Todos os Arquivos (*.*)",
-            options=QFileDialog.DontUseNativeDialog
+            "Arquivos de Áudio (*.mp3 *.wav *.aac *.flac *.ogg *.m4a);;Todos os Arquivos (*.*)"
         )
         if paths:
             for path in paths:
@@ -1083,17 +1108,17 @@ class LyraMainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def browse_destination(self):
-        path = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Destino", self.lbl_dest_path.text(), options=QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly)
+        path = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Destino", self.lbl_dest_path.text(), options=QFileDialog.ShowDirsOnly)
         if path: 
             self.lbl_dest_path.setText(path)
             self.settings.setValue("last_destination", path)
 
     def add_files_dialog(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "Adicionar Arquivos", os.path.expanduser("~"), options=QFileDialog.DontUseNativeDialog)
+        paths, _ = QFileDialog.getOpenFileNames(self, "Adicionar Arquivos", os.path.expanduser("~"))
         for path in paths: self.add_file_to_table(path)
 
     def add_folder_dialog(self):
-        path = QFileDialog.getExistingDirectory(self, "Adicionar Pasta", os.path.expanduser("~"), options=QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly)
+        path = QFileDialog.getExistingDirectory(self, "Adicionar Pasta", os.path.expanduser("~"), options=QFileDialog.ShowDirsOnly)
         if path:
             for root, _, files in os.walk(path):
                 for f in files: self.add_file_to_table(os.path.join(root, f))

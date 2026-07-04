@@ -2,6 +2,19 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.16] - 2026-07-03
+
+### Adicionado
+* **Suporte a Formatos WEBM e OPUS:** Adicionada compatibilidade completa com os formatos WEBM (vídeo) e OPUS (áudio), incluindo mapeamento inteligente das legendas convertidas automaticamente para `webvtt`.
+* **Novos Codecs Visuais (VP8 e VP9):** Integrados os encoders `libvpx-vp9` e `libvpx-vp8` diretamente na interface, permitindo exportar arquivos com alta eficiência.
+* **Trava Dinâmica (UX/UI):** Implementado um sistema inteligente de bloqueio visual que remove encoders incompatíveis (como VP8/VP9 e OPUS) caso o usuário selecione recipientes inadequados (como MP4 ou AVI), evitando falhas nas conversões.
+* **Fallback e Segurança no Motor (FFmpeg):** Adicionado um fallback automático no engine de conversão que substitui de forma transparente codecs inválidos (impedindo crashes no backend).
+
+### Corrigido
+* **Bugs de UI no Windows (Checkbox Invisível):** Corrigido o bug visual no Windows em que caminhos contendo espaços quebravam o interpretador QSS (CSS), deixando as caixas de seleção invisíveis.
+* **Janelas do Sistema em Inglês:** Removida a trava `DontUseNativeDialog`. O sistema agora invoca os gerenciadores de arquivos do próprio Sistema Operacional, aproveitando as traduções em português (ou do idioma nativo do user).
+* **Script de Compilação (Limpeza):** O script `auto_build.sh` agora detecta e apaga corretamente os arquivos finais `.deb` e `.flatpak` gerados na raiz quando a opção de Limpeza de Cache é acionada.
+
 ## [1.1.15] - 2026-06-30
 
 ### Adicionado
