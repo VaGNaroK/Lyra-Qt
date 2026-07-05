@@ -131,8 +131,18 @@ class FFmpegEngine(QObject):
             format_info = data.get("format", {})
             out.append(f"Arquivo: {os.path.basename(file_path)}")
             
-            size_mb = int(format_info.get("size", 0)) / (1024 * 1024)
-            out.append(f"Tamanho: {size_mb:.2f} MB")
+            # fallback seguro de sistema se o ffprobe não trouxer size
+            try:
+                size_bytes = os.path.getsize(file_path)
+            except Exception:
+                size_bytes = int(format_info.get("size", 0))
+                
+            if size_bytes > 0 and size_bytes < 1024 * 1024:
+                size_kb = size_bytes / 1024
+                out.append(f"Tamanho: {size_kb:.2f} KB")
+            else:
+                size_mb = size_bytes / (1024 * 1024)
+                out.append(f"Tamanho: {size_mb:.2f} MB")
             
             fmt_name = format_info.get("format_name", "Desconhecido").split(",")[0]
             out.append(f"Formato: {fmt_name}")
@@ -156,6 +166,30 @@ class FFmpegEngine(QObject):
                         out.append(f"🖼️ IMAGEM (Faixa {i})")
                         out.append(f"Formato: {codec_name}")
                         out.append(f"Resolução: {stream.get('width', '?')}x{stream.get('height', '?')}")
+                        
+                        pix_fmt = stream.get("pix_fmt", "").lower()
+                        if pix_fmt:
+                            if "rgba" in pix_fmt or "bgra" in pix_fmt:
+                                space = "RGBA (Com Transparência / Alpha)"
+                            elif "rgb" in pix_fmt or "bgr" in pix_fmt:
+                                space = "RGB (Cores Digitais)"
+                            elif "cmyk" in pix_fmt:
+                                space = "CMYK (Padrão de Impressão Gráfica)"
+                            elif "gray" in pix_fmt or "mono" in pix_fmt:
+                                space = "Escala de Cinza (Monocromático)"
+                            elif "yuv" in pix_fmt:
+                                space = "YUV / YCbCr (Padrão Fotográfico)"
+                            else:
+                                space = pix_fmt.upper()
+                            out.append(f"Espaço de Cor: {space}")
+                        
+                        bits = stream.get("bits_per_raw_sample")
+                        if bits:
+                            out.append(f"Profundidade: {bits}-bit")
+                            
+                        profile = stream.get("profile")
+                        if profile and profile.lower() != "unknown":
+                            out.append(f"Perfil: {profile}")
                     else:
                         out.append(f"🎬 VÍDEO (Faixa {i})")
                         out.append(f"Codec: {codec_name}")
@@ -204,6 +238,125 @@ class FFmpegEngine(QObject):
         except Exception as e:
             return f"❌ Erro ao analisar mídia: {str(e)}"
     
+    def get_media_specs(self, file_path):
+        """
+        Extrai configurações exatas de um arquivo de mídia para clonagem (smart analysis).
+        
+        Returns:
+            dict: Dicionário contendo vcodec, vbitrate, vsize, vfps, acodec, abitrate, afreq, achannels.
+        """
+        specs = {
+            "vcodec": "default",
+            "vbitrate": "default",
+            "vsize": "default",
+            "vfps": "default",
+            "acodec": "default",
+            "abitrate": "default",
+            "afreq": "default",
+            "achannels": "default"
+        }
+        if not os.path.exists(file_path):
+            return specs
+            
+        try:
+            cmd = [self.ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file_path]
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
+            if result.returncode != 0:
+                return specs
+
+            data = json.loads(result.stdout)
+            format_info = data.get("format", {})
+            streams = data.get("streams", [])
+            
+            for stream in streams:
+                codec_type = stream.get("codec_type", "").lower()
+                codec_name = stream.get("codec_name", "").lower()
+                
+                if codec_type == "video":
+                    # Codec Mapping for NVENC
+                    if "h264" in codec_name:
+                        specs["vcodec"] = "h264_nvenc"
+                    elif "hevc" in codec_name or "h265" in codec_name:
+                        specs["vcodec"] = "h.265 nvenc"
+                    elif "vp9" in codec_name:
+                        specs["vcodec"] = "libvpx-vp9"
+                    elif "vp8" in codec_name:
+                        specs["vcodec"] = "libvpx-vp8"
+                    else:
+                        specs["vcodec"] = "libx264" # fallback
+                    
+                    # Resolution
+                    w, h = stream.get("width"), stream.get("height")
+                    if w and h:
+                        specs["vsize"] = f"{w}x{h}"
+                        
+                    # FPS
+                    fr = stream.get("avg_frame_rate", "0/0")
+                    if "/" in fr:
+                        num, den = fr.split("/")
+                        if den != "0":
+                            fps = round(float(num) / float(den), 3)
+                            # Normaliza framerates comuns
+                            if fps in [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]:
+                                specs["vfps"] = str(fps).replace(".0", "")
+                            else:
+                                specs["vfps"] = str(fps).replace(".0", "")
+
+                    # Video Bitrate
+                    bit_rate = stream.get("bit_rate") or stream.get("max_bit_rate")
+                    if not bit_rate:
+                        tags = stream.get("tags", {})
+                        bps_keys = [k for k in tags.keys() if "BPS" in k.upper()]
+                        if bps_keys:
+                            bit_rate = tags[bps_keys[0]]
+                    if not bit_rate:
+                        # Fallback to general format bitrate if stream lacks it
+                        bit_rate = format_info.get("bit_rate")
+                    
+                    if bit_rate and str(bit_rate).isdigit():
+                        kbps = int(bit_rate) // 1000
+                        specs["vbitrate"] = f"{kbps} kbps"
+
+                elif codec_type == "audio":
+                    # We only care about the first audio stream for cloning
+                    if specs["acodec"] == "default":
+                        # Codec Mapping
+                        if "aac" in codec_name: specs["acodec"] = "aac"
+                        elif "mp3" in codec_name: specs["acodec"] = "libmp3lame"
+                        elif "vorbis" in codec_name: specs["acodec"] = "libvorbis"
+                        elif "opus" in codec_name: specs["acodec"] = "libopus"
+                        
+                        # Audio Bitrate
+                        bit_rate = stream.get("bit_rate")
+                        if not bit_rate:
+                            tags = stream.get("tags", {})
+                            bps_keys = [k for k in tags.keys() if "BPS" in k.upper()]
+                            if bps_keys: bit_rate = tags[bps_keys[0]]
+                        if bit_rate and str(bit_rate).isdigit():
+                            kbps = int(bit_rate) // 1000
+                            specs["abitrate"] = f"{kbps} kbps"
+                            
+                        # Audio Sample Rate (Freq)
+                        freq = stream.get("sample_rate")
+                        if freq:
+                            specs["afreq"] = f"{freq} Hz"
+                            
+                        # Channels
+                        channels = stream.get("channels")
+                        if channels:
+                            if channels == 1: specs["achannels"] = "1 (Mono)"
+                            elif channels == 2: specs["achannels"] = "2 (Stereo)"
+                            elif channels == 6: specs["achannels"] = "6 (5.1)"
+
+            return specs
+        except Exception:
+            return specs
+
+    
     def get_audio_tracks(self, file_path):
         """
         Lista todas as faixas de áudio disponíveis dentro de um arquivo multimídia.
@@ -249,10 +402,9 @@ class FFmpegEngine(QObject):
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
             data = json.loads(result.stdout)
             tracks = []
-            for stream in data.get("streams", []):
-                global_idx = stream.get("index")
+            for idx, stream in enumerate(data.get("streams", [])):
                 lang = stream.get("tags", {}).get("language", "ND").upper()
-                tracks.append((global_idx, f"Faixa {global_idx} - Legenda ({lang})"))
+                tracks.append((idx, f"Faixa {idx+1} - Legenda ({lang})"))
             return tracks
         except Exception:
             return []
@@ -397,6 +549,10 @@ class FFmpegEngine(QObject):
         is_subtitle_only = ext_destino in ["srt", "ass", "vtt"]
 
         if is_subtitle_only:
+            input_ext = os.path.splitext(input_file)[1].lower().replace(".", "")
+            if input_ext in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv", "mp3", "ogg", "wav", "aac", "flac", "wma", "ac3", "opus", "m4a"]:
+                self.log_updated.emit(f"⚠️ Aviso de Blindagem: O arquivo original '{os.path.basename(input_file)}' é de uma mídia ({input_ext.upper()}) que nativamente não suporta legendas embutidas. A extração irá falhar.\n")
+                
             # Configuração otimizada para extração limpa de legenda
             sub_track = options.get("extract_sub_track", 0)
             cmd.extend(["-i", input_file])
@@ -490,7 +646,7 @@ class FFmpegEngine(QObject):
             # Remove faixas marcadas (Mapeamento Negativo)
             remove_tracks = options.get("remove_sub_tracks", [])
             for track in remove_tracks:
-                cmd.extend(["-map", f"-0:{track}?"])
+                cmd.extend(["-map", f"-0:s:{track}?"])
 
         # 3.4. Áudios Externos mapeados sequencialmente
         for i in range(len(valid_audios)):
@@ -672,6 +828,20 @@ class FFmpegEngine(QObject):
             if vf_filters: cmd.extend(["-vf", ",".join(vf_filters)])
             if af_filters: cmd.extend(["-af", ",".join(af_filters)])
 
+        metadata = options.get("metadata", {})
+        if metadata.get("title"):
+            cmd.extend(["-metadata", f"title={metadata['title']}"])
+        if metadata.get("artist"):
+            cmd.extend(["-metadata", f"artist={metadata['artist']}"])
+        if metadata.get("album"):
+            cmd.extend(["-metadata", f"album={metadata['album']}"])
+        if metadata.get("year"):
+            cmd.extend(["-metadata", f"date={metadata['year']}"])
+        if metadata.get("genre"):
+            cmd.extend(["-metadata", f"genre={metadata['genre']}"])
+        if metadata.get("comment"):
+            cmd.extend(["-metadata", f"comment={metadata['comment']}"])
+
         extra = options.get("extra_args", "")
         if extra: cmd.extend(extra.split(" "))
 
@@ -711,3 +881,25 @@ class FFmpegEngine(QObject):
         """
         if self.process and self.process.state() == QProcess.Running:
             self.process.kill()
+
+    def shutdown_pc(self):
+        """Executa o desligamento do computador via sistema operacional ou DBus (Flatpak)"""
+        is_flatpak = "FLATPAK_ID" in os.environ
+        if os.name == 'nt':
+            os.system("shutdown /s /t 0")
+        else:
+            if is_flatpak:
+                subprocess.Popen(["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager.PowerOff", "boolean:true"])
+            else:
+                os.system("systemctl poweroff")
+
+    def suspend_pc(self):
+        """Executa a suspensão do computador via sistema operacional ou DBus (Flatpak)"""
+        is_flatpak = "FLATPAK_ID" in os.environ
+        if os.name == 'nt':
+            os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+        else:
+            if is_flatpak:
+                subprocess.Popen(["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager.Suspend", "boolean:true"])
+            else:
+                os.system("systemctl suspend")

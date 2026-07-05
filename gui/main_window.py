@@ -39,8 +39,8 @@ class LyraMainWindow(QMainWindow):
         super().__init__()
         self.settings = QSettings("Lyra", "Lyra-Qt")
         self.setWindowTitle(f"Lyra Multimedia Converter v{version}")
-        self.resize(1024, 650)
-        self.setMinimumSize(850, 550)
+        self.resize(1150, 700)
+        self.setMinimumSize(950, 550)
         self.setAcceptDrops(True)
 
         self.version = version
@@ -257,9 +257,16 @@ class LyraMainWindow(QMainWindow):
         self.action_add_file = QAction("📄 Adicionar Arquivo", self)
         self.action_add_folder = QAction("📁 Adicionar Pasta", self)
         self.action_remove = QAction("🗑️ Remover", self)
+        self.action_remove.setToolTip("Remove os arquivos selecionados da lista de conversão.")
+        
         self.action_clear = QAction("🧹 Limpar Lista", self)
+        self.action_clear.setToolTip("Limpa todos os arquivos da lista atual.")
+        
         self.action_download = QAction("🌐 Baixar da Web", self)
+        self.action_download.setToolTip("Abre a ferramenta para baixar vídeos e áudios direto de links da internet.")
+        
         self.action_advanced = QAction("⚙️ Opções Avançadas", self)
+        self.action_advanced.setToolTip("Acessa configurações detalhadas como qualidade, filtros, cortes e metadados.")
 
         self.toolbar.addAction(self.action_add_file)
         self.toolbar.addAction(self.action_add_folder)
@@ -273,6 +280,7 @@ class LyraMainWindow(QMainWindow):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
+
 
         self.btn_convert = QPushButton("🚀 Converter")
         self.btn_convert.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold; padding: 6px 15px; font-size: 13px;")
@@ -315,18 +323,26 @@ class LyraMainWindow(QMainWindow):
         format_layout.addWidget(QLabel("🎬 Formato:"))
         format_layout.addWidget(self.combo_format)
         
+        self.btn_clone_specs = QPushButton("🧠 Clonar Info")
+        self.btn_clone_specs.setToolTip("Clonar propriedades do vídeo selecionado na lista para o perfil atual")
+        self.btn_clone_specs.clicked.connect(self.clone_video_specs)
+        format_layout.addWidget(self.btn_clone_specs)
+        
         self.combo_presets = QComboBox()
         self.combo_presets.setMinimumWidth(200)
         self.combo_presets.currentIndexChanged.connect(self.on_preset_selected)
 
         self.btn_save_preset = QPushButton("💾 Salvar Preset")
+        self.btn_save_preset.setToolTip("Salva suas configurações de áudio/vídeo atuais como um novo perfil.")
         self.btn_save_preset.clicked.connect(self.save_new_preset)
 
         self.btn_delete_preset = QPushButton("🗑️ Remover")
+        self.btn_delete_preset.setToolTip("Deleta o perfil de conversão selecionado (exceto Padrões do Sistema).")
         self.btn_delete_preset.clicked.connect(self.delete_selected_preset)
         self.btn_delete_preset.setEnabled(False)
 
         self.btn_reset_all = QPushButton("🔄 Restaurar Padrões")
+        self.btn_reset_all.setToolTip("Desfaz qualquer modificação e retorna às configurações ideais de fábrica.")
         self.btn_reset_all.clicked.connect(self._trigger_hard_reset)
 
         format_layout.addWidget(QLabel("📂 Presets:"))
@@ -378,6 +394,13 @@ class LyraMainWindow(QMainWindow):
         dest_layout.addWidget(self.btn_browse_dest)
         dest_layout.addWidget(self.btn_open_dest)
         dest_layout.addStretch()
+        
+        lbl_post_action = QLabel("Ao concluir: ")
+        lbl_post_action.setStyleSheet("font-weight: bold;")
+        self.combo_post_action = QComboBox()
+        self.combo_post_action.addItems(["Não fazer nada", "Fechar o Lyra", "Suspender PC", "Desligar PC"])
+        dest_layout.addWidget(lbl_post_action)
+        dest_layout.addWidget(self.combo_post_action)
         main_layout.addLayout(dest_layout)
         self.stacked_widget.addWidget(self.main_page)
 
@@ -389,6 +412,7 @@ class LyraMainWindow(QMainWindow):
         self.advanced_page = QWidget()
         advanced_layout = QVBoxLayout(self.advanced_page)
         self.tab_widget = QTabWidget()
+        self.tab_widget.setUsesScrollButtons(True)
         self.create_audio_tab()
         self.create_sync_tab()
         self.create_trim_tab()
@@ -397,6 +421,7 @@ class LyraMainWindow(QMainWindow):
         self.create_subtitle_tab()
         self.create_filters_tab()
         self.create_more_tab()
+        self.create_tags_tab()
         self.create_info_tab()
         self.create_log_tab()
         
@@ -760,6 +785,17 @@ class LyraMainWindow(QMainWindow):
                     item.setEnabled(not restrict)
                     if restrict and self.combo_audio_codec.currentIndex() == i:
                         self.combo_audio_codec.setCurrentIndex(0)
+                        
+        if fmt == "WEBM":
+            vcodec = self.combo_video_codec.currentText()
+            if vcodec not in ["default", "copy", "libvpx-vp9", "libvpx-vp8"]:
+                idx = self.combo_video_codec.findText("libvpx-vp9")
+                if idx != -1: self.combo_video_codec.setCurrentIndex(idx)
+                
+            acodec = self.combo_audio_codec.currentText()
+            if acodec not in ["default", "copy", "libvorbis", "libopus"]:
+                idx = self.combo_audio_codec.findText("libopus")
+                if idx != -1: self.combo_audio_codec.setCurrentIndex(idx)
 
     def create_image_tab(self):
         tab = QWidget()
@@ -1013,6 +1049,43 @@ class LyraMainWindow(QMainWindow):
         layout.addRow("⚙️ Executável do Conversor:", self.entry_ffmpeg_path)
         self.tab_widget.addTab(tab, "➕ Mais Opções")
 
+    def create_tags_tab(self):
+        tab = QWidget()
+        layout = QFormLayout(tab)
+
+        lbl_warning = QLabel("ℹ️ <b>Nota:</b> Renomear o Título do arquivo só tem efeito se você for converter <b>1 único arquivo</b>.<br>Os outros metadados (Artista, Álbum, etc) serão aplicados em conversões em lote normalmente.")
+        lbl_warning.setStyleSheet("color: #757575; font-size: 11px;")
+        lbl_warning.setWordWrap(True)
+        layout.addRow(lbl_warning)
+
+        self.entry_meta_title = QLineEdit()
+        self.entry_meta_title.setPlaceholderText("Ex: video_de_gatinho (Sem a extensão)")
+        self.entry_meta_title.setToolTip("Substitui o nome do arquivo original por este caso você converta apenas 1 arquivo.")
+        
+        self.entry_meta_artist = QLineEdit()
+        self.entry_meta_artist.setPlaceholderText("Ex: Autor ou Artista")
+        
+        self.entry_meta_album = QLineEdit()
+        self.entry_meta_album.setPlaceholderText("Ex: Nome do Álbum")
+        
+        self.entry_meta_year = QLineEdit()
+        self.entry_meta_year.setPlaceholderText("Ex: 2026")
+        
+        self.entry_meta_genre = QLineEdit()
+        self.entry_meta_genre.setPlaceholderText("Ex: Rock, Tutorial, Game")
+        
+        self.entry_meta_comment = QLineEdit()
+        self.entry_meta_comment.setPlaceholderText("Ex: Convertido com o Lyra")
+
+        layout.addRow("📌 Título (Novo Nome):", self.entry_meta_title)
+        layout.addRow("👤 Autor/Artista:", self.entry_meta_artist)
+        layout.addRow("💿 Álbum:", self.entry_meta_album)
+        layout.addRow("📅 Ano (Data):", self.entry_meta_year)
+        layout.addRow("🎭 Gênero:", self.entry_meta_genre)
+        layout.addRow("💬 Comentário:", self.entry_meta_comment)
+
+        self.tab_widget.addTab(tab, "🏷️ Marcadores")
+
     def create_log_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -1199,12 +1272,23 @@ class LyraMainWindow(QMainWindow):
                 "t": self.spin_pad_top.value(), "b": self.spin_pad_bottom.value(),
                 "l": self.spin_pad_left.value(), "r": self.spin_pad_right.value()
             },
+            "metadata": {
+                "title": getattr(self, 'entry_meta_title', None).text().strip() if hasattr(self, 'entry_meta_title') else "",
+                "artist": getattr(self, 'entry_meta_artist', None).text().strip() if hasattr(self, 'entry_meta_artist') else "",
+                "album": getattr(self, 'entry_meta_album', None).text().strip() if hasattr(self, 'entry_meta_album') else "",
+                "year": getattr(self, 'entry_meta_year', None).text().strip() if hasattr(self, 'entry_meta_year') else "",
+                "genre": getattr(self, 'entry_meta_genre', None).text().strip() if hasattr(self, 'entry_meta_genre') else "",
+                "comment": getattr(self, 'entry_meta_comment', None).text().strip() if hasattr(self, 'entry_meta_comment') else ""
+            },
             "threads": self.slider_threads.value(),
             "extra_args": self.entry_extra_args.text().strip()
         }
 
     def start_conversion_queue(self):
         if self.is_converting or self.table_files.rowCount() == 0: return
+        
+        # 🔒 SNAPSHOT DA SESSÃO: Congela as opções da UI no momento do clique para toda a fila
+        self.current_batch_options = self.get_ui_options()
         
         # Reseta o status de arquivos marcados que já foram concluídos ou deram erro
         for row in range(self.table_files.rowCount()):
@@ -1237,16 +1321,37 @@ class LyraMainWindow(QMainWindow):
                 break
 
         if row_to_process == -1:
+            if hasattr(self, 'current_batch_options'):
+                self.current_batch_options = None
             self.stop_conversion_queue()
             self.text_log.appendPlainText("\n--- FILA DE CONVERSÃO CONCLUÍDA ---\n")
             self._play_done_sound()
             self._show_tray_message("Lyra", "Conversão Concluída!", QSystemTrayIcon.Information, 5000)
-            if self.isActiveWindow(): QMessageBox.information(self, "Aviso", "Conversão da lista concluída!")
+            
+            post_action = self.combo_post_action.currentText()
+            if post_action == "Fechar o Lyra":
+                QApplication.quit()
+            elif post_action == "Suspender PC":
+                self.engine.suspend_pc()
+            elif post_action == "Desligar PC":
+                self.engine.shutdown_pc()
+            else:
+                if self.isActiveWindow(): QMessageBox.information(self, "Aviso", "Conversão da lista concluída!")
+            
             return
 
+        ui_opts = getattr(self, 'current_batch_options', self.get_ui_options())
         input_file = self.table_files.item(row_to_process, 1).toolTip()
         duration = float(self.table_files.item(row_to_process, 3).toolTip())
-        output_file = os.path.join(self.lbl_dest_path.text(), f"{os.path.splitext(os.path.basename(input_file))[0]}.{self.combo_format.currentText().lower()}")
+        
+        base_name = os.path.splitext(os.path.basename(input_file))[0]
+        ext = self.combo_format.currentText().lower()
+        
+        checked_count = sum(1 for r in range(self.table_files.rowCount()) if self.table_files.item(r, 0).checkState() == Qt.Checked)
+        if checked_count == 1 and ui_opts["metadata"]["title"]:
+            base_name = ui_opts["metadata"]["title"]
+            
+        output_file = os.path.join(self.lbl_dest_path.text(), f"{base_name}.{ext}")
 
         if os.path.exists(output_file):
             action = self.combo_exist_action.currentText()
@@ -1266,7 +1371,7 @@ class LyraMainWindow(QMainWindow):
             # Se for "Sobrescrever", segue normalmente, pois o FFmpeg_engine já passa a flag '-y'.
 
         self.table_files.setItem(row_to_process, 7, QTableWidgetItem("Processando..."))
-        self.engine.start_conversion(row_to_process, input_file, output_file, duration, self.get_ui_options())
+        self.engine.start_conversion(row_to_process, input_file, output_file, duration, ui_opts)
 
     def update_progress_ui(self, row, progress, elapsed, rem, size, status):
         self.table_files.item(row, 5).setText(elapsed)
@@ -1459,6 +1564,7 @@ class LyraMainWindow(QMainWindow):
             self.time_end.setTime(QTime(0, 0))
 
         self.update_video_codec_ui()
+        self.update_format_locks()
 
     def _trigger_hard_reset(self):
         self.combo_presets.blockSignals(True)
@@ -1481,6 +1587,58 @@ class LyraMainWindow(QMainWindow):
             QMessageBox.information(self, "Sucesso", f"Preset '{name}' salvo!")
         else:
             QMessageBox.critical(self, "Erro", "Falha ao salvar o preset no disco.")
+
+    def clone_video_specs(self):
+        # Verifica se há um item selecionado na tabela
+        selected_rows = [item.row() for item in self.table_files.selectedItems()]
+        if not selected_rows:
+            QMessageBox.warning(self, "Nenhum arquivo selecionado", "Por favor, selecione um arquivo na lista para clonar as especificações.")
+            return
+            
+        row = selected_rows[0]
+        file_path = self.table_files.item(row, 1).toolTip()
+        if not file_path or not os.path.exists(file_path):
+            return
+        specs = self.engine.get_media_specs(file_path)
+        
+        if specs["vcodec"] == "default" and specs["vbitrate"] == "default":
+            QMessageBox.warning(self, "Falha na análise", "Não foi possível extrair as especificações deste arquivo.")
+            return
+
+        # Prepara o estado do preset para injetar
+        state = self._capture_preset_state()
+        
+        # Sobrescreve as specs do arquivo
+        state["vcodec"] = specs["vcodec"]
+        if specs["vbitrate"] != "default": state["vbitrate"] = specs["vbitrate"]
+        if specs["vsize"] != "default": state["vsize"] = specs["vsize"]
+        if specs["vfps"] != "default": state["vfps"] = specs["vfps"]
+        
+        state["acodec"] = specs["acodec"]
+        if specs["abitrate"] != "default": state["abitrate"] = specs["abitrate"]
+        if specs["afreq"] != "default": state["afreq"] = specs["afreq"]
+        if specs["achannels"] != "default": state["achannels"] = specs["achannels"]
+        
+        # Desabilita o CRF porque clonamos um bitrate exato
+        state["crf_enabled"] = False
+
+        preset_name = f"Clone: {os.path.basename(file_path)}"
+        
+        # Salva apenas em memória (não chama save_preset no disco)
+        self.preset_manager.presets_data[preset_name] = state
+        
+        # Adiciona na interface
+        preset_ui_name = f"⭐ {preset_name}"
+        
+        # Remove se já existir um clone com esse nome na UI
+        idx = self.combo_presets.findText(preset_ui_name)
+        if idx != -1:
+            self.combo_presets.removeItem(idx)
+            
+        self.combo_presets.addItem(preset_ui_name)
+        self.combo_presets.setCurrentIndex(self.combo_presets.count() - 1)
+        
+        QMessageBox.information(self, "Clone Bem Sucedido", f"Especificações de '{os.path.basename(file_path)}' aplicadas como preset temporário.\n\nAltere o formato e inicie a conversão!")
 
     def delete_selected_preset(self):
         current = self.combo_presets.currentText()

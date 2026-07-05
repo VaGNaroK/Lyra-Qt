@@ -2,6 +2,24 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.17] - 2026-07-04
+
+### Adicionado
+* **Clonagem Inteligente de Specs (Motor de Análise):** Um botão inteligente ("🧠 Clonar Info") na aba de Destino extrai bitrates, codec e FPS do arquivo fonte original e cria um *Preset Dinâmico* replicando essas características. Ideal para otimizar tamanho com máxima fidelidade.
+* **Ações Automáticas "Ao Concluir":** Inserido um controle de energia na janela principal. O usuário pode instruir o Lyra a "Fechar o aplicativo", "Suspender Computador" ou "Desligar Computador" ao finalizar a fila de conversões inteira. Permissões seguras via D-Bus (`org.freedesktop.login1`) foram criadas para o empacotamento em Flatpak.
+* **Aba de Marcadores (Metadados ID3/MP4):** Uma nova seção ("🏷️ Marcadores") em *Opções Avançadas*. O usuário pode sobrescrever Título, Artista, Álbum, Gênero e Ano.
+* **Renomeio Dinâmico:** Se um único arquivo for processado, o "Título" fornecido na aba de Marcadores passará a ser utilizado como o novo nome do arquivo convertido gerado no HD.
+* **Ajudas Visuais (ToolTips):** Adicionadas descrições rápidas flutuantes nos botões vitais do app para suavizar a curva de aprendizado de usuários iniciantes.
+* **Informações Avançadas de Imagens:** O painel de Informações da Mídia agora cruza os mapeamentos de pixels do FFprobe para exibir o Perfil, a Profundidade de Cor (ex: 8-bit, 10-bit HDR) e o Espaço de Cor amigável (como RGB, CMYK, YUV ou Escala de Cinza) ao carregar imagens.
+* **Aviso de Blindagem SRT:** Inserido um alerta explícito no console de Logs informando quando o usuário tentar extrair legendas (`.srt`) de mídias nativamente incompatíveis (como Áudios ou Imagens estáticas), educando sobre o motivo da falha do FFmpeg sem interromper a fila.
+
+### Corrigido
+* **Bug de "0.00 MB" em Imagens:** O FFprobe frequentemente omite o pacote de bytes totais em fluxos de imagem estática (`image2`), o que forçava a interface do Lyra a exibir um tamanho falso. Resolvido adicionando um fallback direto à API do SO (`os.path.getsize`) e estabelecendo limite flutuante automático para Kilobytes (KB) em mídias minúsculas.
+* **Quebra de Layout na Janela:** O acúmulo de novas sub-abas em "Opções Avançadas" empurrava os botões da barra superior para fora da tela. Corrigido ativando a rolagem nativa de abas (`setUsesScrollButtons`) e expandindo a janela padrão do app para `1150x700`.
+* **Incompatibilidade em Contêineres WEBM:** O Lyra agora acopla de forma agressiva a lógica de "Trava de UI" à injeção de Presets (como o preset Clonado). Ao tentar empacotar codificações nativas H.264 em recipientes Google WEBM, o app reescreve ativamente a estrutura do perfil para VP9/Opus, corrigindo os crashes do FFmpeg de saída "Invalid argument".
+* **Amnésia de Sessão em Conversões em Lote:** O Lyra sofria de uma vulnerabilidade onde a interface atualizava as opções da fila de conversão dinamicamente. Se o usuário clicasse em outro arquivo na tabela durante a conversão, as configurações do lote se perdiam (como descarte de legendas). Corrigido com a implementação de um *Snapshot de Sessão* na largada da fila, congelando as opções para todo o processamento.
+* **Descarte de Legendas Incompatíveis em Lote:** O mapeamento de remoção de legendas confiava em índices globais (ex: `Faixa 2`), o que falhava quando os arquivos na fila tinham arquiteturas de áudio/vídeo diferentes. O código foi totalmente reestruturado para identificar índices relativos exclusivos (`-map -0:s:N`) integrados no motor do FFmpeg.
+
 ## [1.1.16] - 2026-07-03
 
 ### Adicionado

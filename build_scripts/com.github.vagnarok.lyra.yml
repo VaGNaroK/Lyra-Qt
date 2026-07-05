@@ -22,6 +22,7 @@ finish-args:
   - --share=network
   - --filesystem=home
   - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.freedesktop.login1
   - --env=QT_QPA_PLATFORM=xcb
 
 modules:
