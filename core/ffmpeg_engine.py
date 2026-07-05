@@ -588,7 +588,7 @@ class FFmpegEngine(QObject):
 
         # 1.5 Cortes Temporais (Trimming)
         trim_enabled = options.get("trim_enabled", False)
-        if trim_enabled and not is_image:
+        if trim_enabled:
             trim_start = options.get("trim_start", "00:00:00.000")
             trim_end = options.get("trim_end", "00:00:00.000")
             if trim_start != "00:00:00.000":
@@ -632,12 +632,13 @@ class FFmpegEngine(QObject):
             cmd.extend(["-map", "0:v:0?"])
             
         # 3.2. Áudio Original
-        if options.get("all_tracks"):
-            cmd.extend(["-map", "0:a?"])
-        elif audio_track != -1:
-            cmd.extend(["-map", f"0:a:{audio_track}?"])
-        else:
-            cmd.extend(["-map", "0:a:0?"])
+        if not is_image:
+            if options.get("all_tracks"):
+                cmd.extend(["-map", "0:a?"])
+            elif audio_track != -1:
+                cmd.extend(["-map", f"0:a:{audio_track}?"])
+            else:
+                cmd.extend(["-map", "0:a:0?"])
             
         # 3.3. Legendas Originais
         if not is_audio_only and not is_image:
