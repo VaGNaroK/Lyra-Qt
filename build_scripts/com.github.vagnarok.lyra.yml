@@ -36,8 +36,8 @@ modules:
       cflags: "-O2 -g -std=gnu89 -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-error=int-conversion"
     sources:
       - type: archive
-        url: https://web.mit.edu/kerberos/dist/krb5/1.21/krb5-1.21.2.tar.gz
-        sha256: 7ff8ca255478ef50631f9614622d348923b5e315ede1544db1d70f9dbe4c5677
+        url: https://github.com/krb5/krb5/archive/refs/tags/krb5-1.21.2-final.tar.gz
+        sha256: 5827fa39ead0e7f7b8a158799eb5d50b194129e81b378892caedcafe50c5c195
 
   # ----------------------------------------------------------------------------
   # Modulo 1: Dependências do Python (Instalação isolada dentro da Sandbox)
