@@ -44,7 +44,7 @@ Write-Host "[*] Baixando 7zr.exe e biblioteca libmpv..." -ForegroundColor Yellow
 Invoke-WebRequest -Uri "https://www.7-zip.org/a/7zr.exe" -OutFile "7zr.exe"
 $apiUrl = "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
 $releaseData = Invoke-RestMethod -Uri $apiUrl
-$mpvUrl = ($releaseData.assets | Where-Object { $_.name -match "mpv-dev-x86_64-v3-.*\.7z" })[0].browser_download_url
+$mpvUrl = ($releaseData.assets | Where-Object { $_.name -match "^mpv-dev-x86_64-20.*\.7z$" })[0].browser_download_url
 Invoke-WebRequest -Uri $mpvUrl -OutFile "mpv_dev.7z"
 .\7zr.exe e "mpv_dev.7z" -o"assets\bin" "libmpv-2.dll" -r -y
 if (Test-Path "assets\bin\libmpv-2.dll") {

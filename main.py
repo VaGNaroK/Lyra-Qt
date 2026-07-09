@@ -46,6 +46,16 @@ if os.path.exists(assets_bin_path):
         except Exception:
             pass
 
+    # 🔒 MITIGAÇÃO: Remover o "Mark of the Web" para evitar o WinError 1114 no carregamento via ctypes
+    if sys.platform == "win32":
+        try:
+            for filename in os.listdir(assets_bin_path):
+                zone_id_path = os.path.join(assets_bin_path, filename) + ":Zone.Identifier"
+                if os.path.exists(zone_id_path):
+                    os.remove(zone_id_path)
+        except Exception:
+            pass
+
 # Importação segura da GUI
 try:
     from gui.main_window import LyraMainWindow

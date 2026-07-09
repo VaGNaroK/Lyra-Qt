@@ -41,4 +41,8 @@ dist/
 .DS_Store
 Thumbs.db
 lyra-repo/
+lyra-package/
+diretorio-build/
+*.txt
+!requirements.txt
 project-rules/
