@@ -2,6 +2,15 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.18] - 2026-07-10
+
+### Adicionado
+* **Marca d'água (Watermark):** Suporte nativo para sobreposição de imagens (PNG, JPEG, etc) em vídeos, configurável na aba "Filtros" com opções de redimensionamento (1% a 200%), opacidade e posicionamento em 5 pontos da tela.
+* **Infraestrutura de Testes:** Preparação da base de testes automatizados com a adição do framework `pytest` e `pytest-qt` aos requisitos do projeto.
+
+### Alterado
+* **Normalização Profissional de Áudio (EBU R128):** Substituição do antigo limitador dinâmico (`dynaudnorm`) pelo padrão ouro de mercado para streaming (`loudnorm`). O áudio agora é normalizado de forma cirúrgica mantendo níveis em -16 LUFS e evitando completamente distorções de volume (True Peak cravado em -1.5 dB).
+
 ## [1.1.17] - 2026-07-04
 
 ### Adicionado

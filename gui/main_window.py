@@ -533,7 +533,7 @@ class LyraMainWindow(QMainWindow):
         self.chk_all_tracks = QCheckBox("Incluir todas as faixas de áudio")
         self.chk_all_tracks.toggled.connect(lambda checked: self.combo_audio_track.setEnabled(not checked))
 
-        self.chk_audio_drc = QCheckBox("Normalizar Vozes / Downmix 5.1 (DRC)")
+        self.chk_audio_drc = QCheckBox("Normalização Profissional (EBU R128 / -16 LUFS)")
         self.chk_audio_drc.stateChanged.connect(self._sync_live_audio_filters)
         
         self.chk_noise_reduction = QCheckBox("Reduzir Ruído de Fundo (Rede Neural RNNoise)")
@@ -982,8 +982,59 @@ class LyraMainWindow(QMainWindow):
         pad_layout.addWidget(self.spin_pad_right)
         layout.addWidget(self.group_pad)
 
+        self.group_watermark = QGroupBox("💧 Marca d'água")
+        self.group_watermark.setCheckable(True)
+        self.group_watermark.setChecked(False)
+        self.group_watermark.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
+        wm_layout = QFormLayout(self.group_watermark)
+        
+        self.lbl_wm_image = QLabel("Nenhuma imagem selecionada")
+        self.lbl_wm_image.setWordWrap(True)
+        self.lbl_wm_image.setStyleSheet("background-color: black; border: 1px dashed gray; padding: 5px;")
+        
+        wm_btn_layout = QHBoxLayout()
+        self.btn_wm_select = QPushButton("Escolher imagem...")
+        self.btn_wm_select.clicked.connect(self.select_watermark_image)
+        self.btn_wm_clear = QPushButton("Limpar")
+        self.btn_wm_clear.clicked.connect(self.clear_watermark_image)
+        wm_btn_layout.addWidget(self.btn_wm_select)
+        wm_btn_layout.addWidget(self.btn_wm_clear)
+        
+        self.combo_wm_pos = QComboBox()
+        self.combo_wm_pos.addItems(["Inferior direito", "Inferior esquerdo", "Superior direito", "Superior esquerdo", "Centro"])
+        
+        self.spin_wm_size = QSpinBox()
+        self.spin_wm_size.setRange(1, 200)
+        self.spin_wm_size.setValue(100)
+        self.spin_wm_size.setSuffix("%")
+        
+        self.spin_wm_opacity = QSpinBox()
+        self.spin_wm_opacity.setRange(0, 100)
+        self.spin_wm_opacity.setValue(100)
+        self.spin_wm_opacity.setSuffix("%")
+        
+        self.watermark_path = ""
+        
+        wm_layout.addRow(self.lbl_wm_image)
+        wm_layout.addRow(wm_btn_layout)
+        wm_layout.addRow("📍 Posição:", self.combo_wm_pos)
+        wm_layout.addRow("📏 Tamanho:", self.spin_wm_size)
+        wm_layout.addRow("👻 Opacidade:", self.spin_wm_opacity)
+        
+        layout.addWidget(self.group_watermark)
+
         layout.addStretch()
         self.tab_widget.addTab(tab, "🎨 Filtros")
+
+    def select_watermark_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Escolher imagem de marca d'água", "", "Imagens (*.png *.jpg *.jpeg *.bmp)")
+        if file_path:
+            self.lbl_wm_image.setText(file_path)
+            self.watermark_path = file_path
+
+    def clear_watermark_image(self):
+        self.lbl_wm_image.setText("Nenhuma imagem selecionada")
+        self.watermark_path = ""
 
     def run_auto_crop(self):
         selected = self.table_files.selectedItems()
@@ -1271,6 +1322,13 @@ class LyraMainWindow(QMainWindow):
                 "enabled": self.group_pad.isChecked(),
                 "t": self.spin_pad_top.value(), "b": self.spin_pad_bottom.value(),
                 "l": self.spin_pad_left.value(), "r": self.spin_pad_right.value()
+            },
+            "watermark": {
+                "enabled": getattr(self, 'group_watermark', None) and self.group_watermark.isChecked(),
+                "image_path": getattr(self, 'watermark_path', ""),
+                "position": getattr(self, 'combo_wm_pos', None).currentText() if hasattr(self, 'combo_wm_pos') else "Inferior direito",
+                "size": getattr(self, 'spin_wm_size', None).value() if hasattr(self, 'spin_wm_size') else 100,
+                "opacity": getattr(self, 'spin_wm_opacity', None).value() if hasattr(self, 'spin_wm_opacity') else 100
             },
             "metadata": {
                 "title": getattr(self, 'entry_meta_title', None).text().strip() if hasattr(self, 'entry_meta_title') else "",

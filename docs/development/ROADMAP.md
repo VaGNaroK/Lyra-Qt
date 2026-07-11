@@ -67,3 +67,71 @@ Caso essa funcionalidade entre em desenvolvimento futuro, os passos de integraç
 1. **Injeção de Assets:** O script de download automático do projeto (`auto_build.sh` e PS1) precisará baixar os arquivos de modelo treinado (`.param` / `.bin`) para dentro de `assets/bin/`.
 2. **Novo Motor Modular:** Criação de `core/ai_upscale_engine.py`. Esta classe será um maestro (Orchestrator) para coordenar a rotina de múltiplos processos (as instâncias gêmeas do FFmpeg lidando com Pipes e Subprocessos Popen de forma assíncrona).
 3. **Prova de Conceito (MPV):** A porta de entrada mais segura seria iniciar implementando os Shaders do *Anime4K* diretamente no `MPVPlayerWidget` na Aba Sincronia, provando o funcionamento da aceleração por hardware visualmente sem tocar na pipeline de exportação ainda.
+
+---
+
+# [CONCLUÍDO] Marca d'água (Watermark)
+
+Este roteiro documenta como adicionaremos o recurso de Marca d'água no Lyra-Qt.
+
+## 1. Modificações na GUI (`gui/main_window.py`)
+
+A interface gráfica para a Marca d'água será implementada dentro da aba **"Filtros"**.
+
+* **Novo Grupo Visual:** Adição de um `QGroupBox` ("💧 Marca d'água") no método `create_filters_tab`.
+* **Componentes Interativos:**
+  * `QLabel` com bordas estilizadas para atuar como preview visual (miniatura) da imagem carregada.
+  * Botões interativos: `Escolher imagem...` (com restrição nativa para `.png` e imagens na janela do OS) e `Limpar`.
+  * Caixa de seleção (`QComboBox`) regulando a **Posição**: Superior esquerdo, Superior direito, Centro, Inferior esquerdo e Inferior direito (Sendo este o padrão).
+  * Caixas incrementais (`QSpinBox`) manipulando o **Tamanho** (1% a 200%) e **Opacidade** (0% a 100%).
+* As decisões do usuário nesta seção integrarão o dicionário mestre de opções no `get_ui_options()`.
+
+## 2. A Pipeline do Motor (`core/ffmpeg_engine.py`)
+
+O desenho da imagem no frame de vídeo final será arquitetado de modo que o comando `-map` existente (responsável por áudios e múltiplas legendas) continue imaculado.
+
+* **O Filtro Source (`movie`):**
+  * Para evitar a importação da imagem na stack tradicional do FFmpeg (com `-i`), ela nascerá diretamente dentro do `filtergraph` de vídeo (`-vf`) graças ao filtro nativo `movie`.
+  * Isso injeta o arquivo PNG sem comprometer a contagem de streams global.
+* **Propriedades Dinâmicas:**
+  * O tamanho é processado usando a flag de scala sobre si próprio (`scale=iw*TAMANHO:ih*TAMANHO`).
+  * O índice Alpha de transparência usará o componente `colorchannelmixer=aa=OPACIDADE`.
+* **Cálculo Espacial e Rendering (Overlay):**
+  * O posicionamento é injetado via string posicional. Por exemplo, alinhar no canto inferior direito requer a matemática `W-w-10:H-h-10` (onde W/H é o vídeo principal, e w/h é a largura/altura da marca d'água).
+  * O motor fará o link dos filtros (ex: `yadif` ou de `crop` atuando como `[bg]`) com a marca d'água formatada (`[wm]`) fundindo as duas linhas na renderização final: `[bg][wm]overlay=x:y`.
+
+> [!WARNING]
+> O preview gerado na aba "Filtros" atuará como validação de seleção de arquivo, não como preview ao vivo em cima do vídeo base. O processamento da transparência e scala só tomarão forma via hardware durante a chamada da conversão pelo FFmpeg.
+
+---
+
+# [CONCLUÍDO] Normalização Profissional (EBU R128)
+
+Este roteiro documenta a transição do limitador de áudio dinâmico (`dynaudnorm`) para o padrão ouro de mercado para streaming (`loudnorm`).
+
+## 1. Modificações na GUI (`gui/main_window.py`)
+
+A chave de dados mestre (`audio_drc`) será preservada por retrocompatibilidade com presets já salvos pelo usuário. No entanto, a interface visual deve refletir o nível profissional da nova engine.
+
+* **Rebranding da Label:**
+  * O texto da opção de áudio na aba pertinente deixará de ser `"Normalizar Vozes / Downmix 5.1 (DRC)"`.
+  * O novo texto será: `"Normalização Profissional (EBU R128 / -16 LUFS)"`.
+
+## 2. Motor FFmpeg (`core/ffmpeg_engine.py`)
+
+A engine descartará o compressor agressivo em favor de um processador de "Loudness" real.
+
+* **Filtros Injetados (`af_filters`):**
+  * Ao identificar a solicitação de normalização, manteremos o downmix estérico de segurança (`pan=stereo...`). Isso blinda a pipeline contra cancelamento de fase de pistas 5.1/7.1 nativas.
+  * Substituição cirúrgica da string `"dynaudnorm"` pelo novo framework: `loudnorm=I=-16:LRA=11:TP=-1.5`.
+* **Os Parâmetros R128:**
+  * **I=-16 (Integrated Loudness):** Eleva a base de som de forma inteligente, pareando com padrões da Apple e encostando com folga na exigência do YouTube (-14).
+  * **LRA=11 (Loudness Range):** Traz folga respiratória. As vozes sobem claras e límpidas, anulando o efeito sonoro de "pumping" provocado pelo antigo dynaudnorm em picos de silêncio.
+  * **TP=-1.5 (True Peak):** Um limitador escudo invisível. Impede perfeitamente a distorção do equipamento de som do usuário ao cortar milissegundos estourados a um teto seguro de -1.5 dB.
+
+## 3. Sincronia MPV ao Vivo (`gui/mpv_widget.py`)
+
+O widget que abriga o MPV player precisa gerar um som 1 para 1 idêntico ao da mídia processada no fim.
+
+* A função `update_audio_filters()` espelhará exatamente a regra do core.
+* Removeremos o `dynaudnorm` injetando diretamente nos parâmetros da lavfi do MPV: `loudnorm=I=-16:LRA=11:TP=-1.5`.

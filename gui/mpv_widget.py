@@ -222,7 +222,7 @@ class MPVPlayerWidget(QWidget):
         # 2. Downmix e DRC (Normalização)
         if drc_enabled:
             lavfi_filters.append("pan=stereo|FL=0.5*FC+0.707*FL+0.707*BL+0.5*LFE|FR=0.5*FC+0.707*FR+0.707*BR+0.5*LFE")
-            lavfi_filters.append("dynaudnorm")
+            lavfi_filters.append("loudnorm=I=-16:LRA=11:TP=-1.5")
             
         # 3. Ganho final de Volume (Aplicado APÓS a normalização, evitando esmagamento)
         if volume_pct != 100:

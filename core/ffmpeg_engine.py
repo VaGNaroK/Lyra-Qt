@@ -694,7 +694,7 @@ class FFmpegEngine(QObject):
 
         if options.get("audio_drc") and not is_audio_copy:
             af_filters.append("pan=stereo|FL=0.5*FC+0.707*FL+0.707*BL+0.5*LFE|FR=0.5*FC+0.707*FR+0.707*BR+0.5*LFE")
-            af_filters.append("dynaudnorm")
+            af_filters.append("loudnorm=I=-16:LRA=11:TP=-1.5")
             
         if vol != 100 and not is_audio_copy:
             af_filters.append(f"volume={vol/100.0}")
@@ -826,7 +826,30 @@ class FFmpegEngine(QObject):
                 if "nvenc" in vcodec: cmd.extend(["-r", str(vfps)])
                 else: vf_filters.append(f"fps={vfps}")
 
-            if vf_filters: cmd.extend(["-vf", ",".join(vf_filters)])
+            watermark = options.get("watermark", {})
+            if watermark.get("enabled") and watermark.get("image_path") and os.path.exists(watermark["image_path"]):
+                escaped_img = watermark["image_path"].replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
+                size_factor = watermark.get("size", 100) / 100.0
+                opacity = watermark.get("opacity", 100) / 100.0
+                pos = watermark.get("position", "Inferior direito")
+                
+                if pos == "Superior esquerdo": x, y = "10", "10"
+                elif pos == "Superior direito": x, y = "W-w-10", "10"
+                elif pos == "Centro": x, y = "(W-w)/2", "(H-h)/2"
+                elif pos == "Inferior esquerdo": x, y = "10", "H-h-10"
+                else: x, y = "W-w-10", "H-h-10"
+                
+                wm_setup = f"movie='{escaped_img}'[wm];[wm]scale=iw*{size_factor}:ih*{size_factor},colorchannelmixer=aa={opacity}[wm_mod]"
+                
+                if vf_filters:
+                    base_vf = ",".join(vf_filters)
+                    final_vf = f"{base_vf}[bg];{wm_setup};[bg][wm_mod]overlay={x}:{y}"
+                else:
+                    final_vf = f"{wm_setup};[in][wm_mod]overlay={x}:{y}"
+                
+                cmd.extend(["-vf", final_vf])
+            elif vf_filters:
+                cmd.extend(["-vf", ",".join(vf_filters)])
             if af_filters: cmd.extend(["-af", ",".join(af_filters)])
 
         metadata = options.get("metadata", {})

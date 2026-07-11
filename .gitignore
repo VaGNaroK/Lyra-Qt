@@ -46,3 +46,9 @@ diretorio-build/
 *.txt
 !requirements.txt
 project-rules/
+
+# ==========================================
+# 🧪 Testes Automatizados (Pytest)
+# ==========================================
+.pytest_cache/
+.tox/

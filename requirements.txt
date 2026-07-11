@@ -4,3 +4,5 @@
 PySide6>=6.6.0
 yt-dlp
 python-mpv
+pytest
+pytest-qt
