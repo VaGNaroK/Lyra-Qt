@@ -235,6 +235,40 @@ class MPVPlayerWidget(QWidget):
         else:
             self.mpv.af = ""
 
+    def update_video_filters(self, watermark):
+        if not hasattr(self, 'mpv') or not self.mpv:
+            return
+            
+        is_flatpak = "FLATPAK_ID" in os.environ
+            
+        if not watermark or not watermark.get("enabled") or not watermark.get("image_path") or not os.path.exists(watermark["image_path"]):
+            self.mpv.vf = ""
+            try:
+                self.mpv.hwdec = 'no' if is_flatpak else 'auto-safe'
+            except: pass
+            return
+            
+        try:
+            # Force software decoding when using CPU video filters to prevent format errors
+            self.mpv.hwdec = 'no'
+        except: pass
+        
+        escaped_img = watermark["image_path"].replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
+        size_factor = watermark.get("size", 100) / 100.0
+        opacity = watermark.get("opacity", 100) / 100.0
+        pos = watermark.get("position", "Inferior direito")
+        
+        if pos == "Superior esquerdo": x, y = "10", "10"
+        elif pos == "Superior direito": x, y = "W-w-10", "10"
+        elif pos == "Centro": x, y = "(W-w)/2", "(H-h)/2"
+        elif pos == "Inferior esquerdo": x, y = "10", "H-h-10"
+        else: x, y = "W-w-10", "H-h-10"
+        
+        wm_setup = f"movie='{escaped_img}',format=rgba[wm];[wm]scale=iw*{size_factor}:ih*{size_factor},colorchannelmixer=aa={opacity}[wm_mod]"
+        final_vf = f"{wm_setup};[in][wm_mod]overlay={x}:{y}"
+        
+        self.mpv.vf = f"lavfi=[{final_vf}]"
+
     def __del__(self):
         if hasattr(self, 'mpv') and self.mpv:
             self.mpv.terminate()

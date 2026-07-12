@@ -36,7 +36,7 @@ def test_watermark_filter_injection(engine, tmp_path):
     escaped_img = img_path.replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
     
     # Valida a presença dos parâmetros matemáticos na string
-    assert f"movie='{escaped_img}'[wm]" in vf_arg
+    assert f"movie='{escaped_img}',format=rgba[wm]" in vf_arg
     assert "scale=iw*0.5:ih*0.5" in vf_arg
     assert "colorchannelmixer=aa=0.75[wm_mod]" in vf_arg
     

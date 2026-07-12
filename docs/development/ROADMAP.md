@@ -135,3 +135,106 @@ O widget que abriga o MPV player precisa gerar um som 1 para 1 idêntico ao da m
 
 * A função `update_audio_filters()` espelhará exatamente a regra do core.
 * Removeremos o `dynaudnorm` injetando diretamente nos parâmetros da lavfi do MPV: `loudnorm=I=-16:LRA=11:TP=-1.5`.
+
+---
+
+# [FEATURE] Injeção de Capa (Cover Art) em Arquivos de Áudio
+
+**Objetivo:** Permitir que o usuário insira capas (imagens estáticas) em arquivos de saída estritamente de áudio (MP3, M4A, FLAC, etc.) utilizando a aba de "Marcadores", injetando a imagem no motor FFmpeg sem comprometer as streams de som.
+
+## 1. Modificações na UI (`gui/main_window.py`)
+
+A interface ganhará um módulo para lidar com imagens na aba de **Marcadores**.
+
+* **Painel Visual:** 
+  * Adição de um layout horizontal na função `create_tags_tab()`.
+  * Inclusão de um `QLabel` fixo (`80x80px` ou `100x100px`) para servir como pré-visualização da imagem (exibindo `(nenhum)` como padrão).
+  * Inclusão de um `QLineEdit` bloqueado (somente leitura) que indicará o caminho do arquivo selecionado ou o aviso: *"Sem capa (apenas saída de áudio)"*.
+* **Controles Interativos:**
+  * Botão **"Escolher imagem..."** acoplado a um `QFileDialog` para restrição nativa de imagens estáticas (`.jpg`, `.jpeg`, `.png`).
+  * Botão **"Limpar"** para resetar a seleção, esvaziando a variável de estado e limpando o preview visual.
+* **Integração do Dicionário de Metadados:**
+  * A variável instanciada `self.meta_cover_path` será embutida no dicionário em `get_ui_options()["metadata"]["cover_path"]`.
+  * O reset global em `_reset_advanced_options()` deverá contemplar a limpeza deste bloco.
+
+## 2. A Pipeline do Motor (`core/ffmpeg_engine.py`)
+
+A engine FFmpeg interceptará e injetará fisicamente a capa como uma stream paralela caso o formato alvo seja válido e livre de conflitos.
+
+* **Condição de Segurança (Isolamento de Extensão):**
+  * O código irá validar fortemente a intenção cruzando a flag `is_audio_only` (que cobre extensões como `.mp3`, `.m4a`, `.ogg`, `.flac`).
+  * Se o usuário carregar uma Capa, mas solicitar uma conversão para vídeo (ex: `.mp4`, `.mkv`, `.webm`), a capa deve ser **silenciosamente descartada** para evitar crashes complexos no mapeamento nativo das faixas de vídeo.
+* **Injeção do Input (`-i`):**
+  * Ao confirmar que o destino é puramente áudio e o `cover_path` é válido, o arquivo de imagem será inserido como o **segundo input** no comando base: `-i "caminho_da_capa.jpg"`.
+* **Modificação do Mapeamento (`-map`):**
+  * O bloco clássico de mapeamento de áudio único precisará se desdobrar. A array `cmd` irá requerer as duas fontes independentemente: `-map 0:a?` (resgatando e re-encodando todas as pistas de som do input 0) e `-map 1:v:0` (resgatando a stream de vídeo do input 1, ou seja, a imagem).
+* **Parâmetros Mágicos de Fixação (Disposition):**
+  * Para forçar o FFmpeg a não tratar a stream `1:v:0` como um clipe em looping e sim como um thumbnail estático nativo de arquivo sonoro, serão acionadas as flags de codec de cópia rápida associadas à manipulação de disposição da stream final: `-c:v copy -disposition:v attached_pic`. Isto embute a foto direto no cabecalho do ID3 e MP4 sem estresse no processador.
+
+---
+
+# [FEATURE] Controle de Velocidade de Reprodução
+
+**Objetivo:** Introduzir alteração de velocidade de vídeo e áudio nativamente, com suporte a efeitos de Câmera Rápida (Time-lapse) e Câmera Lenta (Slow-motion). Permitirá preservação inteligente do tom do áudio (pitch) para não distorcer as vozes, e integração visual ao vivo nas abas de Sincronia/Cortes.
+
+## 1. Modificações na UI (`gui/main_window.py`)
+A interface será construída como uma nova aba chamada **"⏩ Velocidade"**, inserida no painel de opções avançadas (junto de Filtros, Sincronia e Cortes).
+
+* **Estrutura da Aba:**
+  * **Texto Explicativo:** `QLabel` com a instrução ("Acima de 1x acelera, abaixo de 1x desacelera").
+  * **Predefinições (Botões):** Um `QHBoxLayout` contendo botões estilizados de acesso rápido: `0.25x`, `0.5x`, `0.75x`, `1x`, `1.5x`, `2x`, `4x`. Ao clicar, eles alimentarão diretamente a caixa de valor principal.
+  * **Controle Fino:** Um `QDoubleSpinBox` variando de `0.10x` a `10.00x` (com saltos de `0.1`), permitindo ajustes manuais cirúrgicos.
+  * **Preservação de Tom:** Um `QCheckBox` "Preservar o tom do áudio" (marcado por padrão) que controla se o usuário terá vozes agudas/graves ou se a voz será processada via Machine Learning/DSP no FFmpeg para manter o timbre realista.
+* **Estado e Resets:**
+  * As escolhas entrarão no método mestre `get_ui_options()["speed"]` carregando a velocidade numérica e a booleana do pitch.
+  * O reset global restaurará para o estado padrão blindado (1.0x, Preservar ativado).
+
+## 2. Integração com o Preview ao Vivo (Aba Sincronia / Cortes)
+O player nativo `MPV` possui bibliotecas de som C nativas para espelhar as alterações em Tempo Real na tela, garantindo que o usuário escute a alteração antes de renderizar o arquivo gigantesco!
+
+* **Controle de Tempo na UI:** A propriedade `speed` é inerente ao libmpv. Modificaremos a injeção ao vivo com `self.mpv.speed = velocidade_escolhida`.
+* **Controle de Tom ao Vivo:** O MPV mapeia `audio-pitch-correction`. Se a opção "Preservar tom" estiver marcada, ativamos `self.mpv['audio-pitch-correction'] = 'yes'`. Se o usuário desmarcar (buscando voz de robô ou esquilo), mandamos `'no'`. O play visual refletirá 100% da realidade do que será exportado.
+
+## 3. A Pipeline do Motor (`core/ffmpeg_engine.py`)
+A mágica ocorrerá via equações matemáticas injetadas nos `vf_filters` (Filtros de Vídeo) e `af_filters` (Filtros de Áudio) diretamente no build do subprocesso final.
+
+* **Vídeo (Filtro `setpts`):**
+  * Exige fração invertida. Para um vídeo em 2x de velocidade, o timestamp será metade do original. O comando renderizado dinamicamente será: `setpts=(1.0/SPEED)*PTS` (ex: `setpts=0.5*PTS`).
+* **Áudio com "Tom Preservado" (Filtro `atempo`):**
+  * O `atempo` não altera o pitch. O limite original do filtro é `0.5` a `100.0`. 
+  * Para blindar contra limites, o código fará *chaining* numérico. Se o usuário quiser `0.25x`, geraremos programaticamente a cadeia `atempo=0.5,atempo=0.5` no lavfi array, diluindo o filtro e impedindo crashes silenciosos.
+* **Áudio sem "Tom Preservado" (Filtro `asetrate`):**
+  * Quando desmarcado, a pipeline invocará o binário auxiliar `ffprobe` (via método `get_audio_sample_rate`) para ler o header do arquivo original. 
+  * Injetaremos: `asetrate=SAMPLE_RATE*SPEED`. Se for `44100Hz` original à `2x` = `88200Hz` (áudio super agudo e ligeiro).
+  * Encadearemos um fix forçado de `aresample=SAMPLE_RATE` para abaixar o buffer de volta ao suporte do container padrão, garantindo que codecs sensíveis de áudio enxerguem o fluxo perfeitamente natural (mesmo com os timbres e tempos totalmente modificados pela UI).
+
+---
+
+# [FEATURE] Menu de Contexto Nativo ("Abrir com...")
+
+**Objetivo:** Integrar o Lyra-Qt aos menus de contexto nativos dos principais gerenciadores de arquivos do ecossistema Linux (Nemo, Dolphin, Nautilus, Caja), permitindo que o usuário clique com o botão direito em múltiplos arquivos de mídia e adicione à fila instantaneamente.
+
+## 1. Modificações de Desktop Entry (Scripts de Build)
+Utilizaremos a especificação Desktop Entry da FreeDesktop (XDG).
+
+* **Construção Debian (`build_scripts/auto_build.sh`):**
+  * Modificação da string do arquivo `lyra-multimedia-converter.desktop`.
+  * Adição da tag semântica: `MimeType=audio/*;video/*;image/*;`
+  * Modificação da linha `Exec` de `...main.py` para `...main.py %U`. A macro `%U` capacita o repasse de múltiplas URLs locais.
+* **Construção Flatpak (`build_scripts/com.github.vagnarok.lyra.yml`):**
+  * O manifesto embutido receberá os mesmos identificadores de MimeType e Macro Executiva (`Exec=lyra %U`). 
+  * O script Bash `/app/bin/lyra` repassará o argumento automaticamente via wildcard nativo (`"$@"`).
+
+## 2. Leitura de Argumentos via CLI (`main.py`)
+A execução cruzada via gerenciador invoca o binário do app via Terminal invisível. 
+
+* A rotina de inicialização em `main.py` deverá varrer o array do Kernel (`sys.argv[1:]`).
+* Exclusão proativa de argumentos nativos do Qt/PySide (`--platform`, `--wayland`, etc).
+* Geração de um array `files_to_load` com os caminhos absolutos confirmados das mídias enviadas.
+
+## 3. Injeção Direta na View (`gui/main_window.py`)
+O app deverá ser capaz de injetar dados na Grid instantaneamente.
+
+* Após o carregamento do pacote gráfico (`window = LyraMainWindow()`), faremos uma intercepção.
+* Loop sobre cada string em `files_to_load`, chamando silenciosamente `window.add_file_to_table(caminho)`.
+* **Impacto na UX:** Esta estratégia ignora popups pesados. A janela já nasce (via evento `.show()`) com todos os metadados de `ffprobe` e mídias visíveis prontas na mesa.

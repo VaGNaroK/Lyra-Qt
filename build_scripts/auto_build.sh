@@ -31,11 +31,23 @@ echo "------------------------------------------------------------"
 echo "Escolha o formato de pacote que deseja gerar e instalar:"
 echo "1) 📦 Pacote Universal (Flatpak Standalone)"
 echo "2) 📦 Pacote Debian (.deb) para Ubuntu/Mint/Debian"
-echo "3) 🧹 Apenas Limpar Caches de Compilação"
-read -p "Digite a opção (1, 2 ou 3): " OPTION
+echo "3) 📦 Ambos (Flatpak e Debian)"
+echo "4) 🧹 Apenas Limpar Caches de Compilação"
+echo "5) ❌ Sair"
+read -p "Digite a opção (1 a 5): " OPTION
 echo "------------------------------------------------------------"
 
-if [ "$OPTION" == "1" ]; then
+if [[ ! "$OPTION" =~ ^[1-5]$ ]]; then
+    echo "❌ Opção inválida. Saindo do script."
+    exit 1
+fi
+
+if [ "$OPTION" == "5" ]; then
+    echo "Saindo sem realizar nenhuma ação."
+    exit 0
+fi
+
+if [ "$OPTION" == "1" ] || [ "$OPTION" == "3" ]; then
     # ==============================================================================
     # 3. COMPILAÇÃO E INSTALAÇÃO: FLATPAK
     # ==============================================================================
@@ -88,7 +100,9 @@ if [ "$OPTION" == "1" ]; then
         echo "✅ Cache limpo com sucesso."
     fi
 
-elif [ "$OPTION" == "2" ]; then
+fi
+
+if [ "$OPTION" == "2" ] || [ "$OPTION" == "3" ]; then
     # ==============================================================================
     # 4. COMPILAÇÃO E INSTALAÇÃO: DEBIAN (.DEB)
     # ==============================================================================
@@ -200,7 +214,9 @@ EOF
         echo "❌ Erro: O pacote $PACKAGE_NAME não foi encontrado após a compilação."
         exit 1
     fi
-elif [ "$OPTION" == "3" ]; then
+fi
+
+if [ "$OPTION" == "4" ]; then
     # ==============================================================================
     # 5. APENAS LIMPEZA DE CACHE E PACOTES
     # ==============================================================================
@@ -213,7 +229,9 @@ elif [ "$OPTION" == "3" ]; then
         rm -rf .flatpak-builder diretorio-build lyra-repo lyra-package
     fi
     
-    if ls *.flatpak *.deb 1> /dev/null 2>&1; then
+    # Verifica se existem pacotes ignorando erros se uma das extensões não existir
+    PKG_COUNT=$(find . -maxdepth 1 \( -name "*.flatpak" -o -name "*.deb" \) 2>/dev/null | wc -l)
+    if [ "$PKG_COUNT" -gt 0 ]; then
         FOUND_CACHE=true
         echo "🧹 Apagando pacotes compilados (*.flatpak, *.deb)..."
         rm -f *.flatpak *.deb
@@ -224,7 +242,5 @@ elif [ "$OPTION" == "3" ]; then
     else
         echo "✨ Nenhum cache ou pacote encontrado. O diretório do projeto já está limpo."
     fi
-else
-    echo "❌ Opção inválida. Saindo do script."
-    exit 1
 fi
+

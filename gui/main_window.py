@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
     QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem
 )
-from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices
+from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices, QStandardItemModel
 from PySide6.QtCore import Qt, QSize, QUrl, QSettings, QTime
 from PySide6.QtMultimedia import QSoundEffect
 from gui.mpv_widget import MPVPlayerWidget
@@ -92,6 +92,9 @@ class LyraMainWindow(QMainWindow):
         chk_unchecked = os.path.join(self.resource_dir, "assets", "icons", "checkbox_unchecked.svg").replace("\\", "/")
         
         checkbox_style = f"""
+        QLineEdit {{
+            placeholder-text-color: white;
+        }}
         QCheckBox::indicator, QTableView::indicator, QListView::indicator {{
             width: 18px;
             height: 18px;
@@ -514,6 +517,7 @@ class LyraMainWindow(QMainWindow):
         layout = QFormLayout(tab)
         
         self.combo_audio_codec = QComboBox()
+        self.combo_audio_codec.setModel(QStandardItemModel())
         self.combo_audio_codec.addItems(["default", "copy", "aac", "libmp3lame", "libvorbis", "libopus", "pcm_s16le"])
         
         self.combo_audio_bitrate = QComboBox()
@@ -683,6 +687,7 @@ class LyraMainWindow(QMainWindow):
         layout = QFormLayout(tab)
         
         self.combo_video_codec = QComboBox()
+        self.combo_video_codec.setModel(QStandardItemModel())
         self.combo_video_codec.addItems(["default", "copy", "libx264", "libx265", "h264_nvenc", "h.265 nvenc", "mpeg4", "libvpx-vp9", "libvpx-vp8"])
 
         self.chk_crf = QCheckBox("Usar Qualidade Inteligente (CRF / CQ)")
@@ -774,8 +779,8 @@ class LyraMainWindow(QMainWindow):
                 item = v_model.item(i)
                 if item:
                     item.setEnabled(not restrict)
-                    if restrict and self.combo_video_codec.currentIndex() == i:
-                        self.combo_video_codec.setCurrentIndex(0)
+                if restrict and self.combo_video_codec.currentIndex() == i:
+                    self.combo_video_codec.setCurrentIndex(0)
                         
         a_model = self.combo_audio_codec.model()
         for i in range(self.combo_audio_codec.count()):
@@ -870,7 +875,7 @@ class LyraMainWindow(QMainWindow):
         self.combo_sub_extract_track.addItems(["Faixa 1 (Padrão)", "Faixa 2", "Faixa 3", "Faixa 4"])
         extract_layout.addRow("🎯 Extrair Faixa:", self.combo_sub_extract_track)
         extract_note = QLabel("<i>Nota: Para extrair, selecione 'SRT' como formato na aba principal.<br>Legendas de imagem (PGS) não são suportadas sem OCR.</i>")
-        extract_note.setStyleSheet("color: gray;")
+        extract_note.setStyleSheet("color: white;")
         extract_layout.addRow(extract_note)
         layout.addWidget(group_extract)
 
@@ -1021,6 +1026,11 @@ class LyraMainWindow(QMainWindow):
         wm_layout.addRow("📏 Tamanho:", self.spin_wm_size)
         wm_layout.addRow("👻 Opacidade:", self.spin_wm_opacity)
         
+        self.group_watermark.toggled.connect(self.update_player_watermark)
+        self.combo_wm_pos.currentIndexChanged.connect(self.update_player_watermark)
+        self.spin_wm_size.valueChanged.connect(self.update_player_watermark)
+        self.spin_wm_opacity.valueChanged.connect(self.update_player_watermark)
+        
         layout.addWidget(self.group_watermark)
 
         layout.addStretch()
@@ -1031,10 +1041,23 @@ class LyraMainWindow(QMainWindow):
         if file_path:
             self.lbl_wm_image.setText(file_path)
             self.watermark_path = file_path
+            self.update_player_watermark()
 
     def clear_watermark_image(self):
         self.lbl_wm_image.setText("Nenhuma imagem selecionada")
         self.watermark_path = ""
+        self.update_player_watermark()
+
+    def update_player_watermark(self):
+        if hasattr(self, 'mpv_widget'):
+            watermark_options = {
+                "enabled": getattr(self, 'group_watermark', None) and self.group_watermark.isChecked(),
+                "image_path": getattr(self, 'watermark_path', ""),
+                "position": self.combo_wm_pos.currentText(),
+                "size": self.spin_wm_size.value(),
+                "opacity": self.spin_wm_opacity.value()
+            }
+            self.mpv_widget.update_video_filters(watermark_options)
 
     def run_auto_crop(self):
         selected = self.table_files.selectedItems()
@@ -1105,7 +1128,7 @@ class LyraMainWindow(QMainWindow):
         layout = QFormLayout(tab)
 
         lbl_warning = QLabel("ℹ️ <b>Nota:</b> Renomear o Título do arquivo só tem efeito se você for converter <b>1 único arquivo</b>.<br>Os outros metadados (Artista, Álbum, etc) serão aplicados em conversões em lote normalmente.")
-        lbl_warning.setStyleSheet("color: #757575; font-size: 11px;")
+        lbl_warning.setStyleSheet("color: white; font-size: 11px;")
         lbl_warning.setWordWrap(True)
         layout.addRow(lbl_warning)
 
@@ -1168,6 +1191,7 @@ class LyraMainWindow(QMainWindow):
         if os.path.exists(file_path):
             if hasattr(self, 'mpv_widget'):
                 self.mpv_widget.play(file_path)
+                self.update_player_watermark()
             if hasattr(self, 'mpv_widget_trim'):
                 self.mpv_widget_trim.play(file_path)
             self.text_media_info.setPlainText("A analisar mídia...")
@@ -1566,6 +1590,13 @@ class LyraMainWindow(QMainWindow):
         self.spin_pad_left.setValue(0)
         self.spin_pad_right.setValue(0)
         
+        if hasattr(self, 'group_watermark'):
+            self.group_watermark.setChecked(False)
+            self.combo_wm_pos.setCurrentIndex(0)
+            self.spin_wm_size.setValue(100)
+            self.spin_wm_opacity.setValue(100)
+            self.clear_watermark_image()
+            
         self.entry_extra_args.setText("")
         
         # Fugitivos da Aba Vídeo

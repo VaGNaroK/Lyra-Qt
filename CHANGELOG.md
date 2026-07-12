@@ -11,6 +11,11 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 ### Alterado
 * **Normalização Profissional de Áudio (EBU R128):** Substituição do antigo limitador dinâmico (`dynaudnorm`) pelo padrão ouro de mercado para streaming (`loudnorm`). O áudio agora é normalizado de forma cirúrgica mantendo níveis em -16 LUFS e evitando completamente distorções de volume (True Peak cravado em -1.5 dB).
 
+### Corrigido
+* **VP8/VP9 Bloqueados no Flatpak:** A aba de vídeo em modo Flatpak apresentava um problema de isolamento de variáveis de UI (remoção nativa de ponteiros do QStandardItemModel pelo Wayland) que travava a interação com codecs específicos. Refatorado para garantir alocação estrita via PySide6.
+* **Opacidade em Imagens Sem Transparência (RGB):** A configuração de opacidade de marca d'água falhava para imagens JPG/JPEG. Corrigido adicionando o suporte forçado ao formato `rgba` no injetor lavfi (`[wm]`) no motor FFmpeg, viabilizando total controle de canal Alpha.
+* **Queda do MPV com Filtros Visuais:** Ao utilizar a aba "Filtros" para exibir Marca D'água ou usar cortes de tela simultaneamente, o preview em tela do MPV engasgava ou crachava por causa do conflito entre o Decoder via GPU (Hardware Decoding) e as renderizações de imagem na CPU. Foi criado um auto-fallback nativo para forçar a GPU a delegar os quadros para o processador sempre que os filtros estiverem ativados, restaurando total fluidez.
+
 ## [1.1.17] - 2026-07-04
 
 ### Adicionado

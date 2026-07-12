@@ -838,8 +838,7 @@ class FFmpegEngine(QObject):
                 elif pos == "Centro": x, y = "(W-w)/2", "(H-h)/2"
                 elif pos == "Inferior esquerdo": x, y = "10", "H-h-10"
                 else: x, y = "W-w-10", "H-h-10"
-                
-                wm_setup = f"movie='{escaped_img}'[wm];[wm]scale=iw*{size_factor}:ih*{size_factor},colorchannelmixer=aa={opacity}[wm_mod]"
+                wm_setup = f"movie='{escaped_img}',format=rgba[wm];[wm]scale=iw*{size_factor}:ih*{size_factor},colorchannelmixer=aa={opacity}[wm_mod]"
                 
                 if vf_filters:
                     base_vf = ",".join(vf_filters)

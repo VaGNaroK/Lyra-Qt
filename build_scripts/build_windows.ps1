@@ -56,8 +56,9 @@ Remove-Item "7zr.exe"
 # 5. Empacotar com PyInstaller
 Write-Host "[*] Iniciando PyInstaller..." -ForegroundColor Cyan
 .\venv\Scripts\pyinstaller.exe --noconfirm --windowed --name "Lyra-Qt" --icon "assets\icons\lyra.ico" `
-    --add-data "assets\sounds\done.wav;assets\sounds" `
-    --add-data "assets\icons\lyra.svg;assets\icons" `
+    --add-data "assets\sounds;assets\sounds" `
+    --add-data "assets\icons;assets\icons" `
+    --add-data "assets\models;assets\models" `
     --add-data "assets\bin\ffmpeg.exe;assets\bin" `
     --add-data "assets\bin\ffprobe.exe;assets\bin" `
     --add-data "assets\bin\yt-dlp.exe;assets\bin" `
