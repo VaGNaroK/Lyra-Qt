@@ -279,15 +279,15 @@ class FFmpegEngine(QObject):
                 if codec_type == "video":
                     # Codec Mapping for NVENC
                     if "h264" in codec_name:
-                        specs["vcodec"] = "h264_nvenc"
+                        specs["vcodec"] = "libx264"
                     elif "hevc" in codec_name or "h265" in codec_name:
-                        specs["vcodec"] = "h.265 nvenc"
+                        specs["vcodec"] = "libx265"
                     elif "vp9" in codec_name:
                         specs["vcodec"] = "libvpx-vp9"
                     elif "vp8" in codec_name:
                         specs["vcodec"] = "libvpx-vp8"
                     else:
-                        specs["vcodec"] = "libx264" # fallback
+                        specs["vcodec"] = "libx264"  # fallback
                     
                     # Resolution
                     w, h = stream.get("width"), stream.get("height")
@@ -532,6 +532,8 @@ class FFmpegEngine(QObject):
             self.process_finished.emit(self.current_row, exitCode, False)
 
     def build_ffmpeg_command(self, input_file, output_file, options, pass_num=0):
+        # ✅ FIX: Trabalhar sempre com cópia para evitar mutação do snapshot da fila de lote
+        options = dict(options)
         """
         Gera a linha de comando exata para ser executada pelo binário do FFmpeg.
         Resolve hardware acceleration, codecs, mapeamento de faixas, filtros de vídeo/áudio e afins.
@@ -600,6 +602,11 @@ class FFmpegEngine(QObject):
         cmd.extend(["-i", input_file])
         vf_filters = []
         af_filters = []
+
+        cover_path = options.get("metadata", {}).get("cover_path", "")
+        has_cover = is_audio_only and cover_path and os.path.isfile(cover_path)
+        if has_cover:
+            cmd.extend(["-i", cover_path])
 
         sub_paths = options.get("sub_paths", [])
         audio_paths = options.get("audio_paths", [])
@@ -674,6 +681,14 @@ class FFmpegEngine(QObject):
             options["acodec"] = "aac" if ext_destino == "mp4" else ("libopus" if ext_destino == "webm" else "default")
             self.log_updated.emit("⚠️ Redução de Ruído ativada: O áudio não pode ser 'copy'. Alterado para recodificação.\n")
             
+        speed_opt = options.get("speed", {"value": 1.0, "preserve_pitch": True})
+        speed_val = speed_opt.get("value", 1.0)
+        speed_preserve = speed_opt.get("preserve_pitch", True)
+        
+        if speed_val != 1.0 and options.get("acodec", "default") == "copy":
+            options["acodec"] = "aac" if ext_destino == "mp4" else ("libopus" if ext_destino == "webm" else "default")
+            self.log_updated.emit("⚠️ Velocidade alterada: O áudio não pode ser 'copy'. Alterado para recodificação.\n")
+            
         is_audio_copy = (options.get("acodec", "default") == "copy")
         vol = options.get("volume", 100)
         
@@ -734,6 +749,28 @@ class FFmpegEngine(QObject):
                 if do_video: vf_filters.append(f"fade=t=out:st={out_start}:d={fade_dur}")
                 if do_audio: af_filters.append(f"afade=t=out:st={out_start}:d={fade_dur}")
 
+        # Velocidade (Speed Control)
+        if speed_val != 1.0:
+            if not is_audio_only:
+                vf_filters.append(f"setpts={1.0/speed_val}*PTS")
+            if not is_audio_copy:
+                if speed_preserve:
+                    tempo = speed_val
+                    while tempo < 0.5:
+                        af_filters.append("atempo=0.5")
+                        tempo /= 0.5
+                    if tempo != 1.0:
+                        af_filters.append(f"atempo={tempo}")
+                else:
+                    specs = self.get_media_specs(input_file)
+                    afreq_str = specs.get("afreq", "44100 Hz")
+                    try:
+                        sample_rate = int(afreq_str.split(" ")[0])
+                    except:
+                        sample_rate = 44100
+                    af_filters.append(f"asetrate={sample_rate * speed_val}")
+                    af_filters.append(f"aresample={sample_rate}")
+
         # 6. Build the Final Output Strategy (Image / Audio / Video)
         if is_image:
             image_codecs = {
@@ -764,14 +801,56 @@ class FFmpegEngine(QObject):
             if freq != "default": cmd.extend(["-ar", freq])
             channels = options.get("channels", "default")
             if channels != "default": cmd.extend(["-ac", channels])
-            cmd.extend(["-vn"])
+            
+            cover_path = options.get("metadata", {}).get("cover_path", "")
+            has_cover = cover_path and os.path.isfile(cover_path)
+            if has_cover:
+                cmd.extend(["-map", "1:v:0", "-c:v", "copy", "-disposition:v", "attached_pic"])
+            else:
+                cmd.extend(["-vn"])
+
             if af_filters: cmd.extend(["-af", ",".join(af_filters)])
 
         else:
+            adv = options.get("video_advanced", {})
             if vcodec != "default":
                 cmd.extend(["-c:v", vcodec])
                 if "nvenc" in vcodec:
                     cmd.extend(["-preset", "p7", "-profile:v", "high", "-tune", "hq", "-cq", "18", "-spatial-aq", "1", "-temporal-aq", "1", "-rc-lookahead", "32", "-b_ref_mode", "2"])
+                elif vcodec in ["libx264", "libx265"]:
+                    # Injeção Handbrake
+                    if adv:
+                        preset = adv.get("preset", "medium")
+                        if pass_num == 1 and adv.get("turbo_first_pass"):
+                            cmd.extend(["-preset", "ultrafast"])
+                        elif preset != "medium":
+                            cmd.extend(["-preset", preset])
+                            
+                        tune = adv.get("tune", "none")
+                        fast_dec = adv.get("fast_decode")
+                        tunes = []
+                        if tune != "none": tunes.append(tune)
+                        if fast_dec and "fastdecode" not in tunes: tunes.append("fastdecode")
+                        if tunes:
+                            cmd.extend(["-tune", ",".join(tunes)])
+                            
+                        profile = adv.get("profile", "auto")
+                        if profile != "auto":
+                            cmd.extend(["-profile:v", profile])
+                            
+                        level = adv.get("level", "auto")
+                        if level != "auto":
+                            cmd.extend(["-level", level])
+                            
+                        x264_opts = adv.get("x264_opts", "")
+                        if x264_opts:
+                            if vcodec == "libx265": cmd.extend(["-x265-params", x264_opts])
+                            else: cmd.extend(["-x264-params", x264_opts])
+                            
+            if adv.get("color_range") == "Limited":
+                cmd.extend(["-color_range", "tv"])
+            elif adv.get("color_range") == "Full":
+                cmd.extend(["-color_range", "pc"])
 
             threads = options.get("threads", 0)
             if threads > 0 and vcodec in ("libx264", "libx265"):
@@ -823,6 +902,12 @@ class FFmpegEngine(QObject):
 
             vfps = options.get("vfps", "default")
             if vfps != "default":
+                fps_mode = adv.get("fps_mode", "vfr") if 'adv' in locals() else "vfr"
+                if fps_mode == "cfr":
+                    cmd.extend(["-vsync", "cfr"])
+                elif fps_mode == "vfr":
+                    cmd.extend(["-vsync", "vfr"])
+                    
                 if "nvenc" in vcodec: cmd.extend(["-r", str(vfps)])
                 else: vf_filters.append(f"fps={vfps}")
 
@@ -866,10 +951,16 @@ class FFmpegEngine(QObject):
             cmd.extend(["-metadata", f"comment={metadata['comment']}"])
 
         extra = options.get("extra_args", "")
-        if extra: cmd.extend(extra.split(" "))
+        if extra:
+            try:
+                import shlex
+                cmd.extend(shlex.split(extra, posix=(os.name != 'nt')))
+            except ValueError as e:
+                self.log_updated.emit(f"⚠️ Argumentos extras malformados e ignorados: {e}\n")
 
         if pass_num == 1:
-            cmd.extend(["-pass", "1", "-passlogfile", options.get("passlog_prefix"), "-an", "-sn", "-f", "null", "/dev/null"])
+            null_output = "NUL" if os.name == 'nt' else "/dev/null"
+            cmd.extend(["-pass", "1", "-passlogfile", options.get("passlog_prefix"), "-an", "-sn", "-f", "null", null_output])
         elif pass_num == 2:
             cmd.extend(["-pass", "2", "-passlogfile", options.get("passlog_prefix"), output_file])
         else:

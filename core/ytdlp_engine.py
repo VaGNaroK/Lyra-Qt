@@ -32,6 +32,14 @@ class YTDLPEngine(QObject):
                 self.ytdlp_bin = "yt-dlp"
 
     def start_download(self, url: str, dest_path: str, mode: int, options: dict):
+        # ✅ FIX: Validar URL antes de passar para o yt-dlp
+        from urllib.parse import urlparse
+        parsed = urlparse(url.strip())
+        if parsed.scheme not in ("http", "https"):
+            self.error_occurred.emit(
+                f"URL inválida: apenas URLs http/https são permitidas. Recebido: '{url[:60]}'"
+            )
+            return
         """
         Inicia o download de uma URL com os parâmetros especificados pelo usuário.
         

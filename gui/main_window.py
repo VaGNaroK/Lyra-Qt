@@ -8,9 +8,9 @@ from PySide6.QtWidgets import (
     QComboBox, QFrame, QAbstractItemView, QFileDialog, QTabWidget,
     QFormLayout, QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QGroupBox, QTimeEdit,
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
-    QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem
+    QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem, QRadioButton
 )
-from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices, QStandardItemModel
+from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices, QStandardItemModel, QPixmap
 from PySide6.QtCore import Qt, QSize, QUrl, QSettings, QTime
 from PySide6.QtMultimedia import QSoundEffect
 from gui.mpv_widget import MPVPlayerWidget
@@ -39,7 +39,7 @@ class LyraMainWindow(QMainWindow):
         super().__init__()
         self.settings = QSettings("Lyra", "Lyra-Qt")
         self.setWindowTitle(f"Lyra Multimedia Converter v{version}")
-        self.resize(1150, 700)
+        self.resize(1050, 700)
         self.setMinimumSize(950, 550)
         self.setAcceptDrops(True)
 
@@ -63,6 +63,7 @@ class LyraMainWindow(QMainWindow):
         self.engine.progress_updated.connect(self.update_progress_ui)
         self.engine.log_updated.connect(self.update_log_ui)
         self.engine.process_finished.connect(self.on_ffmpeg_finished)
+
 
         self.preset_manager = PresetManager()
         self.ytdlp_engine = YTDLPEngine(self.resource_dir)
@@ -175,8 +176,12 @@ class LyraMainWindow(QMainWindow):
 
     def _notify_send_fallback(self, title, message):
         try:
+            icon_path = os.path.join(self.resource_dir, "assets", "icons", "lyra.svg")
+            if not os.path.exists(icon_path):
+                icon_path = "dialog-information"
+            
             subprocess.Popen(
-                ["notify-send", "-i", "lyra", title, message],
+                ["notify-send", "-a", "Lyra", "-i", icon_path, title, message],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
@@ -280,11 +285,6 @@ class LyraMainWindow(QMainWindow):
         self.toolbar.addAction(self.action_download)
         self.toolbar.addAction(self.action_advanced)
 
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.toolbar.addWidget(spacer)
-
-
         self.btn_convert = QPushButton("🚀 Converter")
         self.btn_convert.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold; padding: 6px 15px; font-size: 13px;")
         self.btn_convert.clicked.connect(self.start_conversion_queue)
@@ -294,8 +294,18 @@ class LyraMainWindow(QMainWindow):
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self.stop_conversion_queue)
 
+        # Pequeno espaçamento visual antes dos botões de ação
+        spacer_small = QWidget()
+        spacer_small.setFixedWidth(20)
+        self.toolbar.addWidget(spacer_small)
+
         self.toolbar.addWidget(self.btn_convert)
         self.toolbar.addWidget(self.btn_stop)
+
+        # Espaçador dinâmico após os botões para empurrar todos para a esquerda
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.toolbar.addWidget(spacer)
 
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
@@ -413,9 +423,26 @@ class LyraMainWindow(QMainWindow):
         Áudio, Vídeo, Imagem, Legenda, Filtros e Mais.
         """
         self.advanced_page = QWidget()
-        advanced_layout = QVBoxLayout(self.advanced_page)
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setUsesScrollButtons(True)
+        advanced_layout = QHBoxLayout(self.advanced_page)
+        
+        # Menu Lateral (Vertical Tabs)
+        self.advanced_menu = QListWidget()
+        self.advanced_menu.setFixedWidth(200)
+        self.advanced_menu.setFocusPolicy(Qt.NoFocus)
+        self.advanced_menu.setStyleSheet("""
+            QListWidget::item { padding: 12px; font-weight: bold; border-radius: 5px; margin: 2px; }
+            QListWidget::item:selected { background-color: #2D5A27; color: white; }
+            QListWidget::item:hover { background-color: #3e3e3e; }
+        """)
+        
+        self.advanced_stack = QStackedWidget()
+        
+        advanced_layout.addWidget(self.advanced_menu)
+        advanced_layout.addWidget(self.advanced_stack)
+        
+        # Sincronizador Signal/Slot
+        self.advanced_menu.currentRowChanged.connect(self.advanced_stack.setCurrentIndex)
+        
         self.create_audio_tab()
         self.create_sync_tab()
         self.create_trim_tab()
@@ -423,14 +450,20 @@ class LyraMainWindow(QMainWindow):
         self.create_image_tab()
         self.create_subtitle_tab()
         self.create_filters_tab()
+        self.create_speed_tab()
         self.create_more_tab()
         self.create_tags_tab()
         self.create_info_tab()
         self.create_log_tab()
         
+        self.advanced_menu.setCurrentRow(0)
+        
         self.combo_format.currentTextChanged.connect(self.update_format_locks)
         self.update_format_locks()
-        advanced_layout.addWidget(self.tab_widget)
+
+    def add_advanced_tab(self, tab, title):
+        self.advanced_menu.addItem(title)
+        self.advanced_stack.addWidget(tab)
         self.stacked_widget.addWidget(self.advanced_page)
 
     def create_download_page(self):
@@ -535,12 +568,15 @@ class LyraMainWindow(QMainWindow):
         self.combo_audio_track.currentIndexChanged.connect(self._on_audio_track_changed)
         
         self.chk_all_tracks = QCheckBox("Incluir todas as faixas de áudio")
+        self.chk_all_tracks.setToolTip("Mantém todos os áudios originais (ex: vários idiomas). Se desmarcado, mantém apenas a primeira faixa principal.")
         self.chk_all_tracks.toggled.connect(lambda checked: self.combo_audio_track.setEnabled(not checked))
 
         self.chk_audio_drc = QCheckBox("Normalização Profissional (EBU R128 / -16 LUFS)")
+        self.chk_audio_drc.setToolTip("Normaliza o volume para o padrão de TV e Streaming, levantando vozes baixas e reduzindo explosões estouradas.")
         self.chk_audio_drc.stateChanged.connect(self._sync_live_audio_filters)
         
         self.chk_noise_reduction = QCheckBox("Reduzir Ruído de Fundo (Rede Neural RNNoise)")
+        self.chk_noise_reduction.setToolTip("Usa Inteligência Artificial para limpar o chiado do vento e ruídos constantes de fundo, isolando a voz humana.")
         self.chk_noise_reduction.stateChanged.connect(self._sync_live_audio_filters)
         
         self.slider_volume = QSlider(Qt.Horizontal)
@@ -588,7 +624,7 @@ class LyraMainWindow(QMainWindow):
         layout.addRow(group_external_audio)
         
         # 🔒 AQUI ESTAVA O PROBLEMA: A linha abaixo tinha desaparecido do seu código!
-        self.tab_widget.addTab(tab, "🎵 Áudio")
+        self.add_advanced_tab(tab, "🎵 Áudio")
 
     def create_sync_tab(self):
         tab = QWidget()
@@ -628,8 +664,8 @@ class LyraMainWindow(QMainWindow):
         btn_play = QPushButton("▶️ Play/Pause")
         try:
             btn_play.clicked.connect(lambda: self.mpv_widget.pause(not self.mpv_widget.mpv.pause))
-        except:
-            pass # handle gracefully if mpv not initialized
+        except Exception:
+            pass  # ✅ FIX: Especificar Exception para não engolir SystemExit/KeyboardInterrupt
         
         controls_layout.addWidget(QLabel("⏳ Atraso de Áudio:"))
         controls_layout.addWidget(self.slider_audio_sync)
@@ -637,13 +673,14 @@ class LyraMainWindow(QMainWindow):
         controls_layout.addWidget(btn_play)
         
         layout.addLayout(controls_layout)
-        self.tab_widget.addTab(tab, "⏱️ Sincronia")
+        self.add_advanced_tab(tab, "⏱️ Sincronia")
 
     def create_trim_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
         self.chk_enable_trim = QCheckBox("✂️ Ativar Corte de Vídeo (Trimming)")
+        self.chk_enable_trim.setToolTip("Habilita a seleção de tempo de início e fim. O arquivo final terá apenas o trecho marcado, descartando o resto.")
         self.chk_enable_trim.setChecked(False)
         layout.addWidget(self.chk_enable_trim)
 
@@ -680,46 +717,29 @@ class LyraMainWindow(QMainWindow):
         controls_layout.addWidget(self.btn_mark_end)
 
         layout.addLayout(controls_layout)
-        self.tab_widget.addTab(tab, "✂️ Cortes")
+        self.add_advanced_tab(tab, "✂️ Cortes")
 
     def create_video_tab(self):
         tab = QWidget()
-        layout = QFormLayout(tab)
+        main_layout = QVBoxLayout(tab)
+        
+        # 1. Configurações Básicas
+        grp_basic = QGroupBox("Configurações Básicas")
+        basic_layout = QFormLayout(grp_basic)
         
         self.combo_video_codec = QComboBox()
         self.combo_video_codec.setModel(QStandardItemModel())
         self.combo_video_codec.addItems(["default", "copy", "libx264", "libx265", "h264_nvenc", "h.265 nvenc", "mpeg4", "libvpx-vp9", "libvpx-vp8"])
-
-        self.chk_crf = QCheckBox("Usar Qualidade Inteligente (CRF / CQ)")
-        self.chk_crf.setChecked(True)
         
-        self.slider_crf = QSlider(Qt.Horizontal)
-        self.slider_crf.setRange(0, 51)
-        self.slider_crf.setValue(23)
-        self.lbl_crf_val = QLabel("23 (Qualidade Normal)")
-
-        def update_crf_label(v):
-            if v == 0: text = f"{v} (Sem Perdas / Arquivo Gigante)"
-            elif v <= 17: text = f"{v} (Insana / Transparente)"
-            elif v <= 22: text = f"{v} (Alta Qualidade)"
-            elif v <= 27: text = f"{v} (Qualidade Normal)"
-            elif v <= 34: text = f"{v} (Qualidade Média)"
-            elif v <= 43: text = f"{v} (Qualidade Baixa)"
-            else: text = f"{v} (Péssima / Menor Tamanho)"
-            self.lbl_crf_val.setText(text)
-
-        self.slider_crf.valueChanged.connect(update_crf_label)
-
-        crf_layout = QHBoxLayout()
-        crf_layout.addWidget(self.slider_crf)
-        crf_layout.addWidget(self.lbl_crf_val)
-
-        self.combo_video_bitrate = QComboBox()
-        self.combo_video_bitrate.addItems(["default", "800 kbps", "1200 kbps", "2500 kbps", "5000 kbps", "8000 kbps"])
-        self.combo_video_bitrate.setEditable(True)
-
         self.combo_video_fps = QComboBox()
         self.combo_video_fps.addItems(["default", "23.976", "24", "25", "29.97", "30", "60"])
+        
+        fps_mode_layout = QHBoxLayout()
+        self.radio_vfr = QRadioButton("Taxa de quadros por pico (VFR)")
+        self.radio_cfr = QRadioButton("Taxa constante de quadros (CFR)")
+        self.radio_vfr.setChecked(True)
+        fps_mode_layout.addWidget(self.radio_vfr)
+        fps_mode_layout.addWidget(self.radio_cfr)
         
         self.combo_video_size = QComboBox()
         self.combo_video_size.addItems(["default", "640x480", "854x480 (480p Wide)", "1280x720 (720p)", "1920x1080 (1080p)", "2560x1440 (QuadHD)", "3840x2160 (4K)"])
@@ -728,21 +748,100 @@ class LyraMainWindow(QMainWindow):
         self.combo_video_ratio = QComboBox()
         self.combo_video_ratio.addItems(["default", "4:3", "16:9", "21:9"])
 
-        self.chk_2pass = QCheckBox("Habilitar Codificação em 2-Passos")
+        basic_layout.addRow("📹 Codec de Vídeo:", self.combo_video_codec)
+        basic_layout.addRow("🎞️ Quadros por FPS:", self.combo_video_fps)
+        basic_layout.addRow("", fps_mode_layout)
+        basic_layout.addRow("🖥️ Resolução:", self.combo_video_size)
+        basic_layout.addRow("📐 Proporção (Aspect):", self.combo_video_ratio)
+        main_layout.addWidget(grp_basic)
+        
+        # 2. Qualidade
+        grp_quality = QGroupBox("Qualidade")
+        quality_layout = QFormLayout(grp_quality)
+        
+        self.chk_crf = QCheckBox("Qualidade Constante (RF):")
+        self.chk_crf.setToolTip("Deixa o programa ajustar dinamicamente a taxa de bits para atingir o nível de qualidade desejado.")
+        self.chk_crf.setChecked(True)
+        
+        self.slider_crf = QSlider(Qt.Horizontal)
+        self.slider_crf.setRange(0, 51)
+        self.slider_crf.setValue(23)
+        self.lbl_crf_val = QLabel("23")
+        self.slider_crf.valueChanged.connect(lambda v: self.lbl_crf_val.setText(str(v)))
+        
+        crf_layout = QHBoxLayout()
+        crf_layout.addWidget(self.chk_crf)
+        crf_layout.addWidget(self.slider_crf)
+        crf_layout.addWidget(self.lbl_crf_val)
+        
+        self.combo_video_bitrate = QComboBox()
+        self.combo_video_bitrate.addItems(["default", "800", "1200", "2500", "5000", "8000"])
+        self.combo_video_bitrate.setEditable(True)
+        
+        bitrate_layout = QHBoxLayout()
+        bitrate_layout.addWidget(QLabel("Taxa de Bits (kbps):"))
+        bitrate_layout.addWidget(self.combo_video_bitrate)
+        
+        self.chk_2pass = QCheckBox("Codificação com várias passagens")
+        self.chk_2pass.setToolTip("Faz uma análise prévia do vídeo inteiro. Útil para extrair a máxima qualidade dentro de um limite rígido de Bitrate (Tamanho).")
+        self.chk_turbo_first_pass = QCheckBox("Passe de análise turbo")
+        self.chk_turbo_first_pass.setToolTip("Acelera dramaticamente a primeira passagem (análise) cortando cálculos pesados desnecessários.")
+        self.chk_turbo_first_pass.setEnabled(False)
+        
+        self.chk_2pass.toggled.connect(self.chk_turbo_first_pass.setEnabled)
+        
+        bitrate_opts_layout = QHBoxLayout()
+        bitrate_opts_layout.addWidget(self.chk_2pass)
+        bitrate_opts_layout.addWidget(self.chk_turbo_first_pass)
+        
+        quality_layout.addRow("", crf_layout)
+        quality_layout.addRow("", bitrate_layout)
+        quality_layout.addRow("", bitrate_opts_layout)
+        main_layout.addWidget(grp_quality)
+        
+        # 3. Opções Avançadas de Encoder (Estilo Handbrake)
+        grp_enc = QGroupBox("Otimização do Codificador")
+        enc_layout = QFormLayout(grp_enc)
+        
+        self.combo_color_range = QComboBox()
+        self.combo_color_range.addItems(["Auto", "Limited", "Full"])
+        
+        self.combo_preset = QComboBox()
+        self.combo_preset.addItems(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow", "placebo"])
+        self.combo_preset.setCurrentText("medium")
+        
+        self.combo_tune = QComboBox()
+        self.combo_tune.addItems(["none", "film", "animation", "grain", "stillimage", "psnr", "ssim", "fastdecode", "zerolatency"])
+        
+        self.combo_profile = QComboBox()
+        self.combo_profile.addItems(["auto", "baseline", "main", "high", "high10", "high422", "high444"])
+        
+        self.combo_level = QComboBox()
+        self.combo_level.addItems(["auto", "3.0", "3.1", "4.0", "4.1", "4.2", "5.0", "5.1", "5.2"])
+        
+        self.chk_fast_decode = QCheckBox("Codificação rápida (Fast Decode)")
+        self.chk_fast_decode.setToolTip("Desliga o CABAC e Deblocking. O arquivo final será maior, mas extremamente leve para dispositivos velhos reproduzirem.")
+        
+        self.entry_x264_opts = QLineEdit()
+        self.entry_x264_opts.setPlaceholderText("Ex: bframes=3:cabac=1")
+        
+        enc_layout.addRow("Color Range:", self.combo_color_range)
+        enc_layout.addRow("Predefinido (Preset):", self.combo_preset)
+        enc_layout.addRow("Sintonia (Tune):", self.combo_tune)
+        enc_layout.addRow("Perfil (Profile):", self.combo_profile)
+        enc_layout.addRow("Nível (Level):", self.combo_level)
+        enc_layout.addRow("", self.chk_fast_decode)
+        enc_layout.addRow("Opções Adicionais:", self.entry_x264_opts)
+        
+        main_layout.addWidget(grp_enc)
+
         self.chk_video_only = QCheckBox("Somente Vídeo (Remover Áudio)")
+        self.chk_video_only.setToolTip("Remove todas as faixas de áudio, resultando num arquivo de vídeo mudo.")
         self.chk_bad_index = QCheckBox("Corrigir index de arquivo corrompido")
-
-        layout.addRow("📹 Codec de Vídeo:", self.combo_video_codec)
-        layout.addRow("", self.chk_crf)
-        layout.addRow("🎯 Qualidade (CRF):", crf_layout)
-        layout.addRow("💎 Taxa de Bits (Bitrate):", self.combo_video_bitrate)
-        layout.addRow("🎞️ Quadros por FPS:", self.combo_video_fps)
-        layout.addRow("🖥️ Resolução:", self.combo_video_size)
-        layout.addRow("📐 Proporção (Aspect):", self.combo_video_ratio)
-        layout.addRow("", self.chk_2pass)
-        layout.addRow("", self.chk_video_only)
-        layout.addRow("", self.chk_bad_index)
-
+        self.chk_bad_index.setToolTip("Recria o cabeçalho e os tempos (timestamps) do vídeo. Útil se o arquivo original está travando no player de mídia.")
+        main_layout.addWidget(self.chk_video_only)
+        main_layout.addWidget(self.chk_bad_index)
+        
         def toggle_crf_mode(checked):
             self.slider_crf.setEnabled(checked)
             self.combo_video_bitrate.setEnabled(not checked)
@@ -757,7 +856,7 @@ class LyraMainWindow(QMainWindow):
         self.update_video_codec_ui()
         toggle_crf_mode(True)
 
-        self.tab_widget.addTab(tab, "🎥 Vídeo")
+        self.add_advanced_tab(tab, "🎥 Vídeo")
 
     def update_video_codec_ui(self):
         codec = self.combo_video_codec.currentText()
@@ -828,7 +927,7 @@ class LyraMainWindow(QMainWindow):
 
         layout.addRow("🖼️ Resolução (Tamanho):", self.combo_img_size)
         layout.addRow("🎯 Compressão (1-31):", img_quality_layout)
-        self.tab_widget.addTab(tab, "🖼️ Imagem")
+        self.add_advanced_tab(tab, "🖼️ Imagem")
 
     def create_subtitle_tab(self):
         tab = QWidget()
@@ -888,7 +987,7 @@ class LyraMainWindow(QMainWindow):
         layout.addWidget(group_remove)
 
         layout.addStretch()
-        self.tab_widget.addTab(tab, "📝 Legendas")
+        self.add_advanced_tab(tab, "📝 Legendas")
 
     def browse_subtitle(self):
         paths, _ = QFileDialog.getOpenFileNames(
@@ -918,6 +1017,7 @@ class LyraMainWindow(QMainWindow):
         self.combo_rotate = QComboBox()
         self.combo_rotate.addItems(["Normal", "90° Horário", "90° Anti-horário", "180°", "Espelhar Horizontal", "Espelhar Vertical"])
         self.chk_deinterlace = QCheckBox("Aplicar Desentrelaçamento (Yadif)")
+        self.chk_deinterlace.setToolTip("Remove os 'riscos horizontais' (efeito pente) presentes em gravações analógicas antigas de TV ou DVDs interlaçados.")
         basic_layout.addRow("🔄 Rotação:", self.combo_rotate)
         basic_layout.addRow("", self.chk_deinterlace)
         layout.addWidget(basic_group)
@@ -1034,7 +1134,7 @@ class LyraMainWindow(QMainWindow):
         layout.addWidget(self.group_watermark)
 
         layout.addStretch()
-        self.tab_widget.addTab(tab, "🎨 Filtros")
+        self.add_advanced_tab(tab, "🎨 Filtros")
 
     def select_watermark_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Escolher imagem de marca d'água", "", "Imagens (*.png *.jpg *.jpeg *.bmp)")
@@ -1094,6 +1194,58 @@ class LyraMainWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "Erro", "Não foi possível analisar as bordas deste ficheiro.")
 
+    def create_speed_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        lbl_info = QLabel("ℹ️ <b>Controle de Velocidade:</b> Acima de 1x acelera, abaixo de 1x desacelera.")
+        lbl_info.setStyleSheet("color: white; font-size: 11px;")
+        layout.addWidget(lbl_info)
+
+        # Preset buttons
+        presets_layout = QHBoxLayout()
+        speeds = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 4.0]
+        for s in speeds:
+            btn = QPushButton(f"{s}x")
+            btn.clicked.connect(lambda checked=False, val=s: self.spin_speed.setValue(val))
+            presets_layout.addWidget(btn)
+        layout.addLayout(presets_layout)
+
+        # Fine tuning
+        fine_layout = QFormLayout()
+        self.spin_speed = QDoubleSpinBox()
+        self.spin_speed.setRange(0.10, 10.00)
+        self.spin_speed.setSingleStep(0.1)
+        self.spin_speed.setValue(1.0)
+        self.spin_speed.valueChanged.connect(self.update_speed_live)
+        fine_layout.addRow("Velocidade Exata:", self.spin_speed)
+
+        # Pitch Preservation
+        self.chk_pitch = QCheckBox("Preservar o tom do áudio")
+        self.chk_pitch.setToolTip("Faz cálculos pesados para evitar a distorção 'Voz de Esquilo' ao acelerar, ou voz excessivamente grave ao desacelerar.")
+        self.chk_pitch.setChecked(True)
+        self.chk_pitch.toggled.connect(self.update_speed_live)
+        fine_layout.addRow("", self.chk_pitch)
+
+        layout.addLayout(fine_layout)
+        layout.addStretch()
+
+        self.add_advanced_tab(tab, "⏩ Velocidade")
+
+    def update_speed_live(self):
+        speed = self.spin_speed.value()
+        preserve = self.chk_pitch.isChecked()
+        
+        for widget in [getattr(self, 'mpv_widget', None), getattr(self, 'mpv_widget_trim', None)]:
+            if widget and hasattr(widget, 'mpv') and widget.mpv:
+                widget.mpv.speed = speed
+                try:
+                    widget.mpv.audio_pitch_correction = preserve
+                except:
+                    pass
+
+
+
     def create_more_tab(self):
         tab = QWidget()
         layout = QFormLayout(tab)
@@ -1121,7 +1273,7 @@ class LyraMainWindow(QMainWindow):
         layout.addRow("🧠 Threads do Processador:", threads_layout)
         layout.addRow("➕ Argumentos Extras do FFMPEG:", self.entry_extra_args)
         layout.addRow("⚙️ Executável do Conversor:", self.entry_ffmpeg_path)
-        self.tab_widget.addTab(tab, "➕ Mais Opções")
+        self.add_advanced_tab(tab, "➕ Mais Opções")
 
     def create_tags_tab(self):
         tab = QWidget()
@@ -1131,6 +1283,9 @@ class LyraMainWindow(QMainWindow):
         lbl_warning.setStyleSheet("color: white; font-size: 11px;")
         lbl_warning.setWordWrap(True)
         layout.addRow(lbl_warning)
+        spacer = QLabel("")
+        spacer.setFixedHeight(15)
+        layout.addRow(spacer)
 
         self.entry_meta_title = QLineEdit()
         self.entry_meta_title.setPlaceholderText("Ex: video_de_gatinho (Sem a extensão)")
@@ -1151,14 +1306,56 @@ class LyraMainWindow(QMainWindow):
         self.entry_meta_comment = QLineEdit()
         self.entry_meta_comment.setPlaceholderText("Ex: Convertido com o Lyra")
 
+        self.meta_cover_path = ""
+        self.lbl_cover_preview = QLabel("(nenhum)")
+        self.lbl_cover_preview.setFixedSize(80, 80)
+        self.lbl_cover_preview.setAlignment(Qt.AlignCenter)
+        self.lbl_cover_preview.setStyleSheet("border: 1px solid #555;")
+        self.lbl_cover_preview.setScaledContents(True)
+
+        self.entry_cover_path = QLineEdit()
+        self.entry_cover_path.setReadOnly(True)
+        self.entry_cover_path.setPlaceholderText("Sem capa (apenas saída de áudio)")
+
+        btn_choose_cover = QPushButton("Escolher imagem...")
+        btn_choose_cover.clicked.connect(self.choose_cover_art)
+        btn_clear_cover = QPushButton("Limpar")
+        btn_clear_cover.clicked.connect(self.clear_cover_art)
+
+        cover_controls_layout = QHBoxLayout()
+        cover_controls_layout.addWidget(self.entry_cover_path)
+        cover_controls_layout.addWidget(btn_choose_cover)
+        cover_controls_layout.addWidget(btn_clear_cover)
+
         layout.addRow("📌 Título (Novo Nome):", self.entry_meta_title)
         layout.addRow("👤 Autor/Artista:", self.entry_meta_artist)
         layout.addRow("💿 Álbum:", self.entry_meta_album)
         layout.addRow("📅 Ano (Data):", self.entry_meta_year)
         layout.addRow("🎭 Gênero:", self.entry_meta_genre)
         layout.addRow("💬 Comentário:", self.entry_meta_comment)
+        layout.addRow("🖼️ Capa (Áudio):", cover_controls_layout)
+        layout.addRow("", self.lbl_cover_preview)
 
-        self.tab_widget.addTab(tab, "🏷️ Marcadores")
+        self.add_advanced_tab(tab, "🏷️ Marcadores")
+
+    def choose_cover_art(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Selecionar Capa (Cover Art)", "", "Imagens (*.jpg *.jpeg *.png)"
+        )
+        if file_path:
+            self.meta_cover_path = file_path
+            self.entry_cover_path.setText(os.path.basename(file_path))
+            pixmap = QPixmap(file_path)
+            if not pixmap.isNull():
+                self.lbl_cover_preview.setPixmap(pixmap)
+            else:
+                self.lbl_cover_preview.setText("(erro)")
+
+    def clear_cover_art(self):
+        self.meta_cover_path = ""
+        self.entry_cover_path.clear()
+        self.lbl_cover_preview.clear()
+        self.lbl_cover_preview.setText("(nenhum)")
 
     def create_log_tab(self):
         tab = QWidget()
@@ -1167,7 +1364,7 @@ class LyraMainWindow(QMainWindow):
         self.text_log.setReadOnly(True)
         self.text_log.setStyleSheet("background-color: #1e1e1e; color: #00ff00; font-family: monospace; font-size: 11px;")
         layout.addWidget(self.text_log)
-        self.tab_widget.addTab(tab, "📜 Log do FFMPEG")
+        self.add_advanced_tab(tab, "📜 Log do FFMPEG")
 
     def create_info_tab(self):
         tab = QWidget()
@@ -1176,7 +1373,7 @@ class LyraMainWindow(QMainWindow):
         self.text_media_info.setReadOnly(True)
         self.text_media_info.setStyleSheet("background-color: #2b2b2b; color: #ffeb3b; font-family: monospace; font-size: 13px;")
         layout.addWidget(self.text_media_info)
-        self.tab_widget.addTab(tab, "ℹ️ Info da Mídia")
+        self.add_advanced_tab(tab, "ℹ️ Info da Mídia")
 
     def on_file_selected_for_info(self):
         selected_items = self.table_files.selectedItems()
@@ -1360,10 +1557,29 @@ class LyraMainWindow(QMainWindow):
                 "album": getattr(self, 'entry_meta_album', None).text().strip() if hasattr(self, 'entry_meta_album') else "",
                 "year": getattr(self, 'entry_meta_year', None).text().strip() if hasattr(self, 'entry_meta_year') else "",
                 "genre": getattr(self, 'entry_meta_genre', None).text().strip() if hasattr(self, 'entry_meta_genre') else "",
-                "comment": getattr(self, 'entry_meta_comment', None).text().strip() if hasattr(self, 'entry_meta_comment') else ""
+                "comment": getattr(self, 'entry_meta_comment', None).text().strip() if hasattr(self, 'entry_meta_comment') else "",
+                "cover_path": getattr(self, 'meta_cover_path', "")
             },
             "threads": self.slider_threads.value(),
-            "extra_args": self.entry_extra_args.text().strip()
+            "extra_args": self.entry_extra_args.text().strip(),
+            "speed": {
+                "value": getattr(self, 'spin_speed', None).value() if hasattr(self, 'spin_speed') else 1.0,
+                "preserve_pitch": getattr(self, 'chk_pitch', None).isChecked() if hasattr(self, 'chk_pitch') else True
+            },
+
+            "video_advanced": {
+                "fps_mode": "vfr" if getattr(self, 'radio_vfr', None) and self.radio_vfr.isChecked() else "cfr",
+                "color_range": getattr(self, 'combo_color_range', None).currentText() if hasattr(self, 'combo_color_range') else "Auto",
+                "preset": getattr(self, 'combo_preset', None).currentText() if hasattr(self, 'combo_preset') else "medium",
+                "tune": getattr(self, 'combo_tune', None).currentText() if hasattr(self, 'combo_tune') else "none",
+                "profile": getattr(self, 'combo_profile', None).currentText() if hasattr(self, 'combo_profile') else "auto",
+                "level": getattr(self, 'combo_level', None).currentText() if hasattr(self, 'combo_level') else "auto",
+                "fast_decode": getattr(self, 'chk_fast_decode', None).isChecked() if hasattr(self, 'chk_fast_decode') else False,
+                "x264_opts": getattr(self, 'entry_x264_opts', None).text().strip() if hasattr(self, 'entry_x264_opts') else "",
+                "turbo_first_pass": getattr(self, 'chk_turbo_first_pass', None).isChecked() if hasattr(self, 'chk_turbo_first_pass') else False,
+                "video_only": getattr(self, 'chk_video_only', None).isChecked() if hasattr(self, 'chk_video_only') else False,
+                "bad_index": getattr(self, 'chk_bad_index', None).isChecked() if hasattr(self, 'chk_bad_index') else False
+            }
         }
 
     def start_conversion_queue(self):
@@ -1389,7 +1605,7 @@ class LyraMainWindow(QMainWindow):
         self.process_next_file()
 
     def stop_conversion_queue(self):
-        self.engine.stop_all()
+        if hasattr(self, 'engine'): self.engine.stop_all()
         self.is_converting = False
         self.btn_convert.setEnabled(True)
         self.btn_stop.setEnabled(False)
@@ -1424,7 +1640,11 @@ class LyraMainWindow(QMainWindow):
 
         ui_opts = getattr(self, 'current_batch_options', self.get_ui_options())
         input_file = self.table_files.item(row_to_process, 1).toolTip()
-        duration = float(self.table_files.item(row_to_process, 3).toolTip())
+        # ✅ FIX: Tratar toolTip vazio/inválido para imagens e arquivos sem duração detectada
+        try:
+            duration = float(self.table_files.item(row_to_process, 3).toolTip())
+        except (ValueError, TypeError):
+            duration = 0.0
         
         base_name = os.path.splitext(os.path.basename(input_file))[0]
         ext = self.combo_format.currentText().lower()
@@ -1453,6 +1673,7 @@ class LyraMainWindow(QMainWindow):
             # Se for "Sobrescrever", segue normalmente, pois o FFmpeg_engine já passa a flag '-y'.
 
         self.table_files.setItem(row_to_process, 7, QTableWidgetItem("Processando..."))
+        
         self.engine.start_conversion(row_to_process, input_file, output_file, duration, ui_opts)
 
     def update_progress_ui(self, row, progress, elapsed, rem, size, status):
@@ -1578,6 +1799,13 @@ class LyraMainWindow(QMainWindow):
         self.slider_threads.setValue(0)
         self.combo_sub_mode.setCurrentIndex(0)
         
+        if hasattr(self, 'clear_cover_art'):
+            self.clear_cover_art()
+            
+        if hasattr(self, 'spin_speed'):
+            self.spin_speed.setValue(1.0)
+            self.chk_pitch.setChecked(True)
+        
         self.group_crop.setChecked(False)
         self.spin_crop_top.setValue(0)
         self.spin_crop_bottom.setValue(0)
@@ -1596,7 +1824,8 @@ class LyraMainWindow(QMainWindow):
             self.spin_wm_size.setValue(100)
             self.spin_wm_opacity.setValue(100)
             self.clear_watermark_image()
-            
+
+
         self.entry_extra_args.setText("")
         
         # Fugitivos da Aba Vídeo
@@ -1612,6 +1841,18 @@ class LyraMainWindow(QMainWindow):
             self.chk_video_only.setChecked(False)
         if hasattr(self, 'chk_bad_index'):
             self.chk_bad_index.setChecked(False)
+            
+        # Novos itens: Handbrake / Otimização do Codificador
+        if hasattr(self, 'combo_color_range'):
+            self.combo_color_range.setCurrentIndex(0)
+            self.combo_preset.setCurrentText("medium")
+            self.combo_tune.setCurrentIndex(0)
+            self.combo_profile.setCurrentIndex(0)
+            self.combo_level.setCurrentIndex(0)
+            self.chk_fast_decode.setChecked(False)
+            self.chk_turbo_first_pass.setChecked(False)
+            self.entry_x264_opts.setText("")
+            self.radio_vfr.setChecked(True)
 
         # Fugitivos da Aba Áudio
         if hasattr(self, 'combo_audio_track'):
@@ -1642,6 +1883,24 @@ class LyraMainWindow(QMainWindow):
             self.slider_audio_sync.setValue(0)
         if hasattr(self, 'spin_audio_sync'):
             self.spin_audio_sync.setValue(0.0)
+            
+        # Aba Marcadores (Tags)
+        if hasattr(self, 'entry_meta_title'):
+            self.entry_meta_title.setText("")
+        if hasattr(self, 'entry_meta_artist'):
+            self.entry_meta_artist.setText("")
+        if hasattr(self, 'entry_meta_album'):
+            self.entry_meta_album.setText("")
+        if hasattr(self, 'entry_meta_year'):
+            self.entry_meta_year.setText("")
+        if hasattr(self, 'entry_meta_genre'):
+            self.entry_meta_genre.setText("")
+        if hasattr(self, 'entry_meta_comment'):
+            self.entry_meta_comment.setText("")
+            
+        # Aba Mais
+        if hasattr(self, 'entry_ffmpeg_path'):
+            self.entry_ffmpeg_path.setText("ffmpeg")
 
         # Aba Corte (Trimming)
         from PySide6.QtCore import QTime
