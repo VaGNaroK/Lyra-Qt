@@ -1691,9 +1691,12 @@ class LyraMainWindow(QMainWindow):
         if not self.is_converting: return
         row_to_process = -1
         for row in range(self.table_files.rowCount()):
-            if (self.table_files.item(row, 0).checkState() == Qt.Checked and self.table_files.item(row, 7).text() == "Pronto"):
-                row_to_process = row
-                break
+            if self.table_files.item(row, 0).checkState() == Qt.Checked:
+                bar = self.table_files.cellWidget(row, 7)
+                status = bar.format() if isinstance(bar, QProgressBar) else (self.table_files.item(row, 7).text() if self.table_files.item(row, 7) else "")
+                if status == "Pronto":
+                    row_to_process = row
+                    break
 
         if row_to_process == -1:
             if hasattr(self, 'current_batch_options'):
