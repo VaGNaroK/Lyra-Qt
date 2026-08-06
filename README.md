@@ -34,6 +34,8 @@ Para executar o código-fonte na sua máquina, certifique-se de ter instalado:
 3. **FFmpeg** e **FFprobe** (instalados e disponíveis no PATH do seu sistema).
 4. **yt-dlp** (instalado e disponível no PATH do seu sistema).
 5. **libmpv** (Exigido para o player da aba Sincronia. Instale via `sudo apt install libmpv-dev` no Ubuntu/Mint ou `sudo pacman -S mpv` no Arch).
+6. **libxcb-cursor0** (Apenas no Linux, exigido pelo PySide6/Qt 6.5+ para iniciar a interface gráfica. Instale via `sudo apt install libxcb-cursor0` no Ubuntu/Mint).
+
 
 ---
 
