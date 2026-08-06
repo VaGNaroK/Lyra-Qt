@@ -8,7 +8,8 @@ from PySide6.QtWidgets import (
     QComboBox, QFrame, QAbstractItemView, QFileDialog, QTabWidget,
     QFormLayout, QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QGroupBox, QTimeEdit,
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
-    QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem, QRadioButton
+    QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem, QRadioButton,
+    QProgressBar
 )
 from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices, QStandardItemModel, QPixmap
 from PySide6.QtCore import Qt, QSize, QUrl, QSettings, QTime
@@ -263,18 +264,28 @@ class LyraMainWindow(QMainWindow):
         self.toolbar.setStyleSheet("QToolBar QToolButton { font-size: 14px; padding: 4px; font-weight: bold; }")
 
         self.action_add_file = QAction("📄 Adicionar Arquivo", self)
+        self.action_add_file.setShortcut("Ctrl+O")
+        self.action_add_file.setToolTip("Adicionar arquivo(s) à fila de conversão (Ctrl+O)")
+
         self.action_add_folder = QAction("📁 Adicionar Pasta", self)
+        self.action_add_folder.setShortcut("Ctrl+Shift+O")
+        self.action_add_folder.setToolTip("Adicionar pasta recursivamente (Ctrl+Shift+O)")
+
         self.action_remove = QAction("🗑️ Remover", self)
-        self.action_remove.setToolTip("Remove os arquivos selecionados da lista de conversão.")
+        self.action_remove.setShortcut("Delete")
+        self.action_remove.setToolTip("Remove os arquivos selecionados da lista de conversão (Delete).")
         
         self.action_clear = QAction("🧹 Limpar Lista", self)
-        self.action_clear.setToolTip("Limpa todos os arquivos da lista atual.")
+        self.action_clear.setShortcut("Ctrl+L")
+        self.action_clear.setToolTip("Limpa todos os arquivos da lista atual (Ctrl+L).")
         
         self.action_download = QAction("🌐 Baixar da Web", self)
-        self.action_download.setToolTip("Abre a ferramenta para baixar vídeos e áudios direto de links da internet.")
+        self.action_download.setShortcut("Ctrl+D")
+        self.action_download.setToolTip("Abre a ferramenta para baixar vídeos e áudios direto de links da internet (Ctrl+D).")
         
         self.action_advanced = QAction("⚙️ Opções Avançadas", self)
-        self.action_advanced.setToolTip("Acessa configurações detalhadas como qualidade, filtros, cortes e metadados.")
+        self.action_advanced.setShortcut("Ctrl+E")
+        self.action_advanced.setToolTip("Acessa configurações detalhadas como qualidade, filtros, cortes e metadados (Ctrl+E).")
 
         self.toolbar.addAction(self.action_add_file)
         self.toolbar.addAction(self.action_add_folder)
@@ -293,6 +304,9 @@ class LyraMainWindow(QMainWindow):
         self.btn_stop.setStyleSheet("background-color: #C62828; color: white; font-weight: bold; padding: 6px 15px; font-size: 13px;")
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self.stop_conversion_queue)
+
+        self.btn_convert.setShortcut("F5")      # F5 = Iniciar conversão
+        self.btn_stop.setShortcut("Escape")     # Esc = Parar conversão
 
         # Pequeno espaçamento visual antes dos botões de ação
         spacer_small = QWidget()
@@ -460,6 +474,8 @@ class LyraMainWindow(QMainWindow):
         
         self.combo_format.currentTextChanged.connect(self.update_format_locks)
         self.update_format_locks()
+        # ✅ FIX: Carregar player MPV sob demanda ao trocar de aba
+        self.tab_widget.currentChanged.connect(lambda _: self._load_mpv_for_current_tab())
 
     def add_advanced_tab(self, tab, title):
         self.advanced_menu.addItem(title)
@@ -1375,6 +1391,26 @@ class LyraMainWindow(QMainWindow):
         layout.addWidget(self.text_media_info)
         self.add_advanced_tab(tab, "ℹ️ Info da Mídia")
 
+    def _load_mpv_for_current_tab(self):
+        """Carrega o player MPV correto apenas se a aba correspondente estiver ativa."""
+        if not hasattr(self, '_last_selected_file') or not self._last_selected_file:
+            return
+        file_path = self._last_selected_file
+        if not os.path.exists(file_path):
+            return
+
+        tab_names = [self.tab_widget.tabText(i) for i in range(self.tab_widget.count())]
+        current_idx = self.tab_widget.currentIndex()
+
+        sync_idx = next((i for i, t in enumerate(tab_names) if "Sincronia" in t or "⏱️" in t), -1)
+        trim_idx = next((i for i, t in enumerate(tab_names) if "Cortes" in t or "✂️" in t), -1)
+
+        if current_idx == sync_idx and hasattr(self, 'mpv_widget'):
+            self.mpv_widget.play(file_path)
+            self.update_player_watermark()
+        elif current_idx == trim_idx and hasattr(self, 'mpv_widget_trim'):
+            self.mpv_widget_trim.play(file_path)
+
     def on_file_selected_for_info(self):
         selected_items = self.table_files.selectedItems()
         if not selected_items:
@@ -1386,11 +1422,9 @@ class LyraMainWindow(QMainWindow):
         
         # 🔒 AQUI ESTAVA O PROBLEMA: Código duplicado limpo para uma única execução fluida
         if os.path.exists(file_path):
-            if hasattr(self, 'mpv_widget'):
-                self.mpv_widget.play(file_path)
-                self.update_player_watermark()
-            if hasattr(self, 'mpv_widget_trim'):
-                self.mpv_widget_trim.play(file_path)
+            # ✅ FIX: Armazenar o arquivo e carregar MPV apenas na aba visível (lazy-load)
+            self._last_selected_file = file_path
+            self._load_mpv_for_current_tab()
             self.text_media_info.setPlainText("A analisar mídia...")
             info_text = self.engine.get_human_media_info(file_path)
             self.text_media_info.setPlainText(info_text)
@@ -1469,7 +1503,15 @@ class LyraMainWindow(QMainWindow):
                 for f in files: self.add_file_to_table(os.path.join(root, f))
 
     def add_file_to_table(self, file_path):
-        if not os.path.isfile(file_path): return
+        if not os.path.isfile(file_path):
+            return
+        # ✅ FIX: Verificar se o arquivo já está na lista (insensível a maiúsculas no Windows)
+        normalized_path = os.path.normcase(os.path.abspath(file_path))
+        for r in range(self.table_files.rowCount()):
+            existing_item = self.table_files.item(r, 1)
+            if existing_item and os.path.normcase(existing_item.toolTip()) == normalized_path:
+                return  # Arquivo já está na lista, ignorar silenciosamente
+
         row = self.table_files.rowCount()
         self.table_files.insertRow(row)
 
@@ -1489,7 +1531,26 @@ class LyraMainWindow(QMainWindow):
         self.table_files.setItem(row, 4, QTableWidgetItem("--"))
         self.table_files.setItem(row, 5, QTableWidgetItem("--:--:--"))
         self.table_files.setItem(row, 6, QTableWidgetItem("--:--:--"))
-        self.table_files.setItem(row, 7, QTableWidgetItem("Pronto"))
+        # ✅ FIX: QProgressBar visual na coluna de progresso
+        _PROGRESS_STYLE = """
+            QProgressBar {
+                border: 1px solid #555; border-radius: 3px;
+                background-color: #2d2d2d; text-align: center;
+                color: white; font-size: 11px;
+            }
+            QProgressBar::chunk {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #1565C0, stop:1 #42A5F5);
+                border-radius: 2px;
+            }
+        """
+        progress_bar = QProgressBar()
+        progress_bar.setRange(0, 100)
+        progress_bar.setValue(0)
+        progress_bar.setTextVisible(True)
+        progress_bar.setFormat("Pronto")
+        progress_bar.setStyleSheet(_PROGRESS_STYLE)
+        self.table_files.setCellWidget(row, 7, progress_bar)
 
     def remove_selected_files(self):
         if self.is_converting: return
@@ -1591,12 +1652,28 @@ class LyraMainWindow(QMainWindow):
         # Reseta o status de arquivos marcados que já foram concluídos ou deram erro
         for row in range(self.table_files.rowCount()):
             if self.table_files.item(row, 0).checkState() == Qt.Checked:
-                current_status = self.table_files.item(row, 7).text()
-                if current_status in ("Concluído", "Erro"):
-                    self.table_files.item(row, 7).setText("Pronto")
+                # ✅ FIX: Resetar QProgressBar ao reutilizar linha da fila
+                bar = self.table_files.cellWidget(row, 7)
+                if isinstance(bar, QProgressBar):
+                    bar.setValue(0)
+                    bar.setFormat("Pronto")
+                    bar.setStyleSheet("""
+                        QProgressBar { border:1px solid #555; border-radius:3px;
+                            background-color:#2d2d2d; text-align:center; color:white; font-size:11px; }
+                        QProgressBar::chunk { background-color:qlineargradient(
+                            x1:0,y1:0,x2:1,y2:0, stop:0 #1565C0, stop:1 #42A5F5);
+                            border-radius:2px; }
+                    """)
                     self.table_files.item(row, 4).setText("--")
                     self.table_files.item(row, 5).setText("--:--:--")
                     self.table_files.item(row, 6).setText("--:--:--")
+                else:
+                    current_status = self.table_files.item(row, 7)
+                    if current_status and current_status.text() in ("Concluído", "Erro"):
+                        current_status.setText("Pronto")
+                        self.table_files.item(row, 4).setText("--")
+                        self.table_files.item(row, 5).setText("--:--:--")
+                        self.table_files.item(row, 6).setText("--:--:--")
 
         self.is_converting = True
         self.btn_convert.setEnabled(False)
@@ -1679,8 +1756,13 @@ class LyraMainWindow(QMainWindow):
     def update_progress_ui(self, row, progress, elapsed, rem, size, status):
         self.table_files.item(row, 5).setText(elapsed)
         self.table_files.item(row, 6).setText(rem)
-        self.table_files.item(row, 7).setText(status)
-        if size: self.table_files.item(row, 4).setText(size)
+        if size:
+            self.table_files.item(row, 4).setText(size)
+        # ✅ FIX: Atualizar QProgressBar visual
+        bar = self.table_files.cellWidget(row, 7)
+        if isinstance(bar, QProgressBar):
+            bar.setValue(progress)
+            bar.setFormat(status)
 
     def update_log_ui(self, text):
         self.text_log.insertPlainText(text)
@@ -1688,8 +1770,27 @@ class LyraMainWindow(QMainWindow):
 
     def on_ffmpeg_finished(self, row, exitCode, is_download):
         self.text_log.appendPlainText(f"\n[Código de saída: {exitCode}]\n")
-        status = "Concluído" if exitCode == 0 else "Erro"
-        self.table_files.setItem(row, 7, QTableWidgetItem(status))
+        bar = self.table_files.cellWidget(row, 7)
+        if isinstance(bar, QProgressBar):
+            if exitCode == 0:
+                bar.setValue(100)
+                bar.setFormat("✅ Concluído")
+                bar.setStyleSheet("""
+                    QProgressBar { border:1px solid #2E7D32; border-radius:3px;
+                        background-color:#1B5E20; text-align:center; color:white; font-size:11px; }
+                    QProgressBar::chunk { background-color:#4CAF50; border-radius:2px; }
+                """)
+            else:
+                bar.setValue(0)
+                bar.setFormat("❌ Erro")
+                bar.setStyleSheet("""
+                    QProgressBar { border:1px solid #B71C1C; border-radius:3px;
+                        background-color:#4a1a1a; text-align:center; color:white; font-size:11px; }
+                    QProgressBar::chunk { background-color:#EF5350; border-radius:2px; }
+                """)
+        else:
+            status = "Concluído" if exitCode == 0 else "Erro"
+            self.table_files.setItem(row, 7, QTableWidgetItem(status))
         self.process_next_file()
 
     def load_presets(self):

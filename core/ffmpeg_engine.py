@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import time
 import subprocess
 import tempfile
@@ -35,7 +36,6 @@ class FFmpegEngine(QObject):
         self.current_output = ""
         self.current_options = {}
 
-        import sys
         self.ffmpeg_bin = "ffmpeg"
         self.ffprobe_bin = "ffprobe"
 
@@ -58,6 +58,17 @@ class FFmpegEngine(QObject):
         s = int(seconds % 60)
         return f"{h:02}:{m:02}:{s:02}"
 
+    def _get_startupinfo(self):
+        """
+        Retorna um STARTUPINFO configurado para suprimir janelas de console no Windows.
+        Retorna None em Linux/macOS.
+        """
+        if os.name == 'nt':
+            info = subprocess.STARTUPINFO()
+            info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            return info
+        return None
+
     def get_media_duration(self, file_path):
         """
         Executa ffprobe para obter a duração total do arquivo multimídia em segundos.
@@ -68,10 +79,7 @@ class FFmpegEngine(QObject):
         try:
             cmd = [self.ffprobe_bin, "-v", "error", "-show_entries", "format=duration",
                    "-of", "default=noprint_wrappers=1:nokey=1", file_path]
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo = self._get_startupinfo()
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
             val = result.stdout.strip()
             return float(val) if val and val != 'N/A' else 0.0
@@ -89,10 +97,7 @@ class FFmpegEngine(QObject):
             cmd = [self.ffprobe_bin, "-v", "error", "-select_streams", "v:0",
                    "-show_entries", "stream=width,height",
                    "-of", "csv=p=0:s=x", file_path]
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo = self._get_startupinfo()
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
             res = result.stdout.strip().split('x')
             if len(res) == 2:
@@ -113,10 +118,7 @@ class FFmpegEngine(QObject):
             return "❌ Arquivo não encontrado."
         try:
             cmd = [self.ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file_path]
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo = self._get_startupinfo()
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
             if result.returncode != 0:
                 return "❌ Erro ao ler informações da mídia."
@@ -260,10 +262,7 @@ class FFmpegEngine(QObject):
             
         try:
             cmd = [self.ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file_path]
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo = self._get_startupinfo()
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
             if result.returncode != 0:
                 return specs
@@ -368,10 +367,7 @@ class FFmpegEngine(QObject):
             return []
         try:
             cmd = [self.ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_streams", "-select_streams", "a", file_path]
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo = self._get_startupinfo()
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
             data = json.loads(result.stdout)
             tracks = []
@@ -395,10 +391,7 @@ class FFmpegEngine(QObject):
             return []
         try:
             cmd = [self.ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_streams", "-select_streams", "s", file_path]
-            startupinfo = None
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo = self._get_startupinfo()
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, startupinfo=startupinfo)
             data = json.loads(result.stdout)
             tracks = []
@@ -425,10 +418,7 @@ class FFmpegEngine(QObject):
         dur = self.get_media_duration(file_path)
         ss_val = "00:00:15" if dur > 20 else "00:00:00"
         cmd = [self.ffmpeg_bin, "-hide_banner", "-ss", ss_val, "-i", file_path, "-t", "2", "-vf", "cropdetect=24:16:0", "-f", "null", "-"]
-        startupinfo = None
-        if os.name == 'nt':
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo = self._get_startupinfo()
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, startupinfo=startupinfo)
             output = result.stderr

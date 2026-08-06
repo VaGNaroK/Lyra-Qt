@@ -1,5 +1,7 @@
 import os
 import json
+import logging
+logger = logging.getLogger(__name__)
 
 class PresetManager:
     """
@@ -7,10 +9,32 @@ class PresetManager:
     Os presets são salvos localmente em um arquivo JSON na pasta de configurações do usuário.
     """
     def __init__(self):
-        self.preset_dir = os.path.join(os.path.expanduser("~"), ".config", "lyra")
+        import sys
+        # ✅ FIX: Usar o diretório correto conforme o sistema operacional
+        if sys.platform == "win32":
+            base_dir = os.environ.get("APPDATA", os.path.expanduser("~"))
+            self.preset_dir = os.path.join(base_dir, "Lyra")
+        elif sys.platform == "darwin":
+            self.preset_dir = os.path.join(
+                os.path.expanduser("~"), "Library", "Application Support", "Lyra"
+            )
+        else:
+            # Linux/BSD
+            self.preset_dir = os.path.join(os.path.expanduser("~"), ".config", "lyra")
+
         self.preset_file = os.path.join(self.preset_dir, "presets.json")
         self.presets_data = {}
         os.makedirs(self.preset_dir, exist_ok=True)
+
+        # ✅ Migração automática: mover presets do caminho antigo para o novo (apenas Windows)
+        if sys.platform == "win32":
+            old_file = os.path.join(os.path.expanduser("~"), ".config", "lyra", "presets.json")
+            if os.path.exists(old_file) and not os.path.exists(self.preset_file):
+                import shutil
+                try:
+                    shutil.copy2(old_file, self.preset_file)
+                except Exception:
+                    pass
 
     def load_presets(self) -> dict:
         """
@@ -25,7 +49,7 @@ class PresetManager:
                 with open(self.preset_file, "r", encoding="utf-8") as f:
                     self.presets_data = json.load(f)
             except Exception as e:
-                print(f"⚠️ Erro ao carregar presets: {e}")
+                logger.warning("Erro ao carregar presets: %s", e)
                 self.presets_data = {}
         return self.presets_data
 
@@ -70,5 +94,5 @@ class PresetManager:
                 json.dump(self.presets_data, f, indent=2, ensure_ascii=False)
             return True
         except Exception as e:
-            print(f"❌ Erro crítico ao salvar o preset no disco: {e}")
+            logger.error("Erro crítico ao salvar o preset no disco: %s", e)
             return False
