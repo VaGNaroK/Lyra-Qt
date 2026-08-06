@@ -2,6 +2,28 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.20] - 2026-08-06
+
+### Adicionado
+* **Atalhos de Teclado Globais:** Inseridos atalhos de teclado para as principais ações na tela principal (Ctrl+O para adicionar arquivo, F5 para converter, Esc para parar, Delete para remover, entre outros), melhorando drasticamente a usabilidade (UX).
+* **Barra de Progresso Nativa:** A coluna de "Status" na tabela de conversão agora exibe barras de progresso visuais (`QProgressBar`) completas com micro-animações, abandonando o modelo antigo de textos estáticos de porcentagem.
+* **Logs Estruturados:** Implementado o sistema nativo de logging (`logging.getLogger`) em toda a gerência de Presets, substituindo antigas instruções rudimentares de terminal.
+
+### Alterado
+* **Lazy-load do Reprodutor (MPV):** Otimização massiva no uso de CPU/RAM. O motor de pré-visualização de mídia (MPV) agora só é alocado na memória sob demanda, quando o usuário ativamente navega para as abas de "Sincronia" ou "Cortes".
+* **Ocultação de Processos CMD (Windows):** Inserida integração profunda com a API do Windows (subprocess `STARTUPINFO`) para suprimir as aparições repentinas e piscadas de telas pretas do CMD sempre que o FFmpeg opera no background.
+* **Organização e Performance Interna:** Realocadas chamadas isoladas (`import sys`) no topo de módulos essenciais (`ffmpeg_engine.py`), otimizando o carregamento de acordo com a PEP 8.
+
+### Corrigido
+* **Amnésia e Falha no Diretório de Presets:** Corrigido bug crítico onde perfis salvos em máquinas Windows quebravam ou eram gravados fora do escopo do sistema. A aplicação agora utiliza a pasta nativa `%APPDATA%\Lyra` e engatilha a migração automática segura dos presets remanescentes.
+* **Prevenção de Fila Duplicada:** Blindada a interface gráfica contra sobreposições, ignorando silenciosamente re-inserções de arquivos idênticos na tabela de conversões (insensível a letras maiúsculas/minúsculas no Windows).
+* **Crash em Dicionários:** Corrigido bug (`RuntimeError: dictionary changed size during iteration`) que provocava o desligamento do aplicativo em meio a limpezas de memória (`clear_memory`).
+* **Erro Crítico no Modo 2-Pass (Windows):** Resolvido o erro fatal que anulava a conversão de 2 passadas no ambiente Microsoft. O software estava atrelado estaticamente ao diretório `/dev/null` (específico do Linux). Substituído para o uso seguro de `os.devnull`.
+* **Proteção de URLs Vazias:** O motor yt-dlp agora filtra eficientemente campos vazios disparados por acidentes de clique do usuário, impedindo exceptions na GUI.
+* **Ausência do Codec Fallback:** Restaurada a blindagem na codificação MP4 que previne falhas silenciosas de muxing (conversão de puro áudio em MP4 agora obriga o engate do libx264).
+* **Espaços e Aspas no Executável:** O sistema de separação de argumentos de terminal (`shlex.split`) foi calibrado para aceitar caminhos com espaços no Windows (`posix=False`).
+* **Tratamento Genérico de Exceções:** Inúmeras rotinas da interface (Preview, ToolTips de imagens, Players) foram imunizadas, substituindo o perigoso `except:` padrão por detecção estrita de `Exception`.
+
 ## [1.1.19] - 2026-07-12
 
 ### Adicionado
