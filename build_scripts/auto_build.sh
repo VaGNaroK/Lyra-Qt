@@ -173,9 +173,10 @@ EOF
 Version=1.0
 Type=Application
 Name=Lyra Multimedia Converter
-Exec=/usr/games/lyra-app/venv/bin/python3 /usr/games/lyra-app/main.py
+Exec=/usr/games/lyra-app/venv/bin/python3 /usr/games/lyra-app/main.py %U
 Icon=lyra
 Categories=AudioVideo;Utility;
+MimeType=video/mp4;video/x-matroska;video/x-msvideo;video/quicktime;video/webm;video/mpeg;video/x-flv;audio/mpeg;audio/x-wav;audio/ogg;audio/flac;audio/mp4;audio/aac;audio/x-m4a;image/jpeg;image/png;image/webp;image/gif;
 Terminal=false
 StartupWMClass=Lyra Multimedia Converter
 EOF

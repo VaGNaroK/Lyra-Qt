@@ -475,7 +475,7 @@ class LyraMainWindow(QMainWindow):
         self.combo_format.currentTextChanged.connect(self.update_format_locks)
         self.update_format_locks()
         # ✅ FIX: Carregar player MPV sob demanda ao trocar de aba
-        self.tab_widget.currentChanged.connect(lambda _: self._load_mpv_for_current_tab())
+        self.advanced_menu.currentRowChanged.connect(lambda _: self._load_mpv_for_current_tab())
 
     def add_advanced_tab(self, tab, title):
         self.advanced_menu.addItem(title)
@@ -1399,8 +1399,8 @@ class LyraMainWindow(QMainWindow):
         if not os.path.exists(file_path):
             return
 
-        tab_names = [self.tab_widget.tabText(i) for i in range(self.tab_widget.count())]
-        current_idx = self.tab_widget.currentIndex()
+        tab_names = [self.advanced_menu.item(i).text() for i in range(self.advanced_menu.count())]
+        current_idx = self.advanced_menu.currentRow()
 
         sync_idx = next((i for i, t in enumerate(tab_names) if "Sincronia" in t or "⏱️" in t), -1)
         trim_idx = next((i for i, t in enumerate(tab_names) if "Cortes" in t or "✂️" in t), -1)

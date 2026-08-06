@@ -269,6 +269,8 @@ class MPVPlayerWidget(QWidget):
         
         self.mpv.vf = f"lavfi=[{final_vf}]"
 
+
+
     def __del__(self):
         if hasattr(self, 'mpv') and self.mpv:
             self.mpv.terminate()

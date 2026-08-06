@@ -142,9 +142,10 @@ modules:
         Version=1.0
         Type=Application
         Name=Lyra Multimedia Converter
-        Exec=lyra
+        Exec=lyra %U
         Icon=com.github.vagnarok.lyra
         Categories=AudioVideo;Utility;
+        MimeType=video/mp4;video/x-matroska;video/x-msvideo;video/quicktime;video/webm;video/mpeg;video/x-flv;audio/mpeg;audio/x-wav;audio/ogg;audio/flac;audio/mp4;audio/aac;audio/x-m4a;image/jpeg;image/png;image/webp;image/gif;
         Terminal=false
         StartupWMClass=lyra-multimedia-converter
         EOF

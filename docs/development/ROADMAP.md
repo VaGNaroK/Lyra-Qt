@@ -138,7 +138,7 @@ O widget que abriga o MPV player precisa gerar um som 1 para 1 idêntico ao da m
 
 ---
 
-# [FEATURE] Injeção de Capa (Cover Art) em Arquivos de Áudio
+# [CONCLUÍDO] Injeção de Capa (Cover Art) em Arquivos de Áudio
 
 **Objetivo:** Permitir que o usuário insira capas (imagens estáticas) em arquivos de saída estritamente de áudio (MP3, M4A, FLAC, etc.) utilizando a aba de "Marcadores", injetando a imagem no motor FFmpeg sem comprometer as streams de som.
 
@@ -173,7 +173,7 @@ A engine FFmpeg interceptará e injetará fisicamente a capa como uma stream par
 
 ---
 
-# [FEATURE] Controle de Velocidade de Reprodução
+# [CONCLUÍDO] Controle de Velocidade de Reprodução
 
 **Objetivo:** Introduzir alteração de velocidade de vídeo e áudio nativamente, com suporte a efeitos de Câmera Rápida (Time-lapse) e Câmera Lenta (Slow-motion). Permitirá preservação inteligente do tom do áudio (pitch) para não distorcer as vozes, e integração visual ao vivo nas abas de Sincronia/Cortes.
 
@@ -210,7 +210,7 @@ A mágica ocorrerá via equações matemáticas injetadas nos `vf_filters` (Filt
 
 ---
 
-# [FEATURE] Menu de Contexto Nativo ("Abrir com...")
+# [CONCLUÍDO] Menu de Contexto Nativo ("Abrir com...")
 
 **Objetivo:** Integrar o Lyra-Qt aos menus de contexto nativos dos principais gerenciadores de arquivos do ecossistema Linux (Nemo, Dolphin, Nautilus, Caja), permitindo que o usuário clique com o botão direito em múltiplos arquivos de mídia e adicione à fila instantaneamente.
 
@@ -238,3 +238,53 @@ O app deverá ser capaz de injetar dados na Grid instantaneamente.
 * Após o carregamento do pacote gráfico (`window = LyraMainWindow()`), faremos uma intercepção.
 * Loop sobre cada string em `files_to_load`, chamando silenciosamente `window.add_file_to_table(caminho)`.
 * **Impacto na UX:** Esta estratégia ignora popups pesados. A janela já nasce (via evento `.show()`) com todos os metadados de `ffprobe` e mídias visíveis prontas na mesa.
+
+---
+
+# [CONCLUÍDO] Refatoração do Layout de Opções Avançadas (Tabs Verticais)
+
+**Objetivo:** Reestruturar a interface gráfica das "Opções Avançadas" substituindo o modelo horizontal (cujas dezenas de abas estavam ocultando botões críticos ou forçando rolagem lateral) por uma abordagem moderna com Menu Lateral (List Widget) associado a um painel dinâmico em pilha (Stacked Widget). Isso garante robustez visual perpétua para acomodar dezenas de novos recursos futuros sem quebrar a Experiência de Usuário (UX).
+
+## 1. Substituto do Painel Tabular Central (`gui/main_window.py`)
+A função que instanciava as opções de conversão sofrerá um bypass arquitetural drástico:
+* **Remoção Absoluta:** Extermínio do elemento `self.tab_widget = QTabWidget()` instanciado na `create_advanced_page()`.
+* **Novo Layout-Pai:** Implantação de um `QHBoxLayout` (Divisão de Tela lado a lado).
+* **Navegação:** Injeção do `QListWidget` do lado esquerdo com trava de redimensionamento fixo e rolagem autônoma para garantir a usabilidade.
+* **Canvas Exibidor:** Injeção do `QStackedWidget` do lado direito preenchendo o corpo majoritário da tela com as interfaces das ferramentas.
+
+## 2. Refatoração da Inserção das Ferramentas
+Atualmente as doze abas instanciam suas telas e as amarram chamando `self.tab_widget.addTab()`. Isso precisa ser reconstruído internamente para cada módulo isolado.
+* **Ajuste Lógico Universal:** O código nas 12 funções (`create_audio_tab`, `create_video_tab`, etc) passará a repassar o `QWidget` contendo a ferramenta direto para o Array invisível do `QStackedWidget`.
+* **Link de Navegação:** Uma string contendo o título da aba e seu ícone será injetada em um item do `QListWidget`.
+* **Conector Signal/Slot:** Um trigger `currentRowChanged` no menu lateral forçará a atualização imediata (`setCurrentIndex`) do StackedWidget, refletindo instantaneamente a aba selecionada sem causar *freezes*.
+
+---
+
+# [CONCLUÍDO] Painel de Vídeo Avançado (Estilo Handbrake)
+
+**Objetivo:** Reconstruir a aba "Vídeo" com suporte massivo a controles profissionais (semelhante ao UI do Handbrake), garantindo que usuários avançados consigam manipular o Encoder com perfeição diretamente da interface, sem precisar decorar parâmetros longos de linha de comando.
+
+## 1. Nova Interface (`gui/main_window.py`)
+A função `create_video_tab()` receberá um layout completo (provavelmente utilizando agrupamentos `QGroupBox` ou `QGridLayout`) para espelhar as opções solicitadas.
+
+### Elementos:
+* **Modo de Taxa de Quadros:** Dois `QRadioButton`: "Taxa constante de quadros (CFR)" e "Taxa de quadros por pico (VFR)".
+* **Color Range:** `QComboBox` com as opções (Auto, Limited, Full).
+* **Predefinido (Preset):** Um `QSlider` horizontal ou `QComboBox` com suporte às predefinições universais (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow, placebo).
+* **Sintonia (Tune):** `QComboBox` (none, film, animation, grain, stillimage, psnr, ssim, fastdecode, zerolatency).
+* **Perfil (Profile):** `QComboBox` dinâmico focado em perfis clássicos (baseline, main, high, etc).
+* **Nível (Level):** `QComboBox` dinâmico variando sobre os suportes tradicionais (auto, 3.0, 3.1, 4.0, 4.1, 4.2, 5.0, 5.1, 5.2).
+* **Opções Adicionais:** Um `QTextEdit` ou `QLineEdit` projetado para injetar parâmetros customizados no encoder (ex: `-x264-params` ou extras limpos).
+* **Passe de Análise Turbo:** Um `QCheckBox` complementar ao modo de 2-pass.
+* **Codificação Rápida:** Um `QCheckBox` complementar.
+
+## 2. Injeção Dinâmica em `get_ui_options`
+* Captura de todos os widgets implementados em um dicionário agrupado em `get_ui_options`.
+
+## 3. Modificações no FFmpeg Engine (`core/ffmpeg_engine.py`)
+O motor extrairá as marcações de interface para forjar os argumentos:
+* **VFR/CFR:** Injeção rigorosa de `-fps_mode vfr` ou `-fps_mode cfr` nas flags do `-r`.
+* **Color Range:** `tv` para Limited, `pc` para Full.
+* **Preset, Tune, Profile, Level:** Conectados nas respectivas propriedades puras: `-preset`, `-tune`, `-profile:v`, `-level`.
+* **Turbo Pass e 2-Pass:** Mapear a passagem 1 com `-fastfirstpass 1` ou forçando `-preset ultrafast` somado à supressão temporal para turbinar o _log creation_.
+* **Opções Adicionais:** Flag nativa `-x264-params` sendo repassada com segurança caso codec seja compatível.

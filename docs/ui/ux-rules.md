@@ -22,3 +22,4 @@ O Lyra-Qt segue diretrizes rigorosas de design para garantir que uma ferramenta 
 ## 5. Bandeja do Sistema e Notificações
 - Suporte a `QSystemTrayIcon`. Se fechado enquanto trabalha, o app vai para o background.
 - Notificações enviadas ao sistema nativo alertando término de processos.
+- **Fallbacks de Notificação (`notify-send`)**: Ao usar chamadas em subprocesso para emitir notificações no sistema nativo, **nunca** dependa de ícones soltos (ex: `-i lyra`). Sempre forneça o **caminho absoluto** do ícone `.svg` embutido nos assets do projeto para garantir que o gerenciador de área de trabalho exiba a notificação corretamente.

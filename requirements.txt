@@ -6,3 +6,4 @@ yt-dlp
 python-mpv
 pytest
 pytest-qt
+numpy

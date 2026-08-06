@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 # 🔒 ÚNICA FONTE DA VERDADE (Single Source of Truth)
 # O package.sh faz grep '^__version__' para extrair este valor.
 # ==============================================================================
-__version__ = "1.1.18"
+__version__ = "1.1.19"
 
 # ==============================================================================
 # 🔒 DETECÇÃO DE AMBIENTE FLATPAK
@@ -55,6 +55,28 @@ if os.path.exists(assets_bin_path):
                     os.remove(zone_id_path)
         except Exception:
             pass
+# ==============================================================================
+# 🔒 INJEÇÃO DE CUDA PATH (CRÍTICO PARA LINUX VENV)
+# Garante que as bibliotecas da NVIDIA instaladas via pip sejam carregadas no ONNX
+# ==============================================================================
+if sys.platform.startswith('linux'):
+    venv_base = os.path.dirname(os.path.dirname(sys.executable))
+    nvidia_libs = os.path.join(venv_base, 'lib', f'python{sys.version_info.major}.{sys.version_info.minor}', 'site-packages', 'nvidia')
+    
+    if os.path.exists(nvidia_libs):
+        cuda_paths = []
+        for folder in os.listdir(nvidia_libs):
+            lib_path = os.path.join(nvidia_libs, folder, 'lib')
+            if os.path.exists(lib_path):
+                cuda_paths.append(lib_path)
+        
+        if cuda_paths:
+            new_ld_path = ":".join(cuda_paths) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+            # Previne loop infinito: só reinicia se a variável ainda não foi configurada
+            if os.environ.get("LYRA_CUDA_INJECTED") != "1":
+                os.environ["LD_LIBRARY_PATH"] = new_ld_path
+                os.environ["LYRA_CUDA_INJECTED"] = "1"
+                os.execv(sys.executable, [sys.executable] + sys.argv)
 
 # Importação segura da GUI
 try:
@@ -67,8 +89,8 @@ if __name__ == "__main__":
     if sys.platform.startswith('linux'):
         os.environ["QT_QPA_PLATFORM"] = "xcb"
 
-    # Silencia log informativo do Qt Multimedia (cosmético)
-    os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.ffmpeg=false")
+    # Silencia logs irrelevantes do Qt Multimedia e do QPA Services (cosmético)
+    os.environ["QT_LOGGING_RULES"] = "*.debug=false;qt.multimedia.*=false;qt.qpa.services=false"
 
     app = QApplication(sys.argv)
     app.setApplicationName("Lyra Multimedia Converter")
@@ -95,5 +117,13 @@ if __name__ == "__main__":
     app.setPalette(dark_palette)
 
     window = LyraMainWindow(__version__, RESOURCE_DIR)
+    
+    # Processa argumentos de linha de comando (ex: via "Abrir com..." do SO)
+    for arg in sys.argv[1:]:
+        if arg.startswith('-'):
+            continue
+        if os.path.exists(arg) and os.path.isfile(arg):
+            window.add_file_to_table(os.path.abspath(arg))
+
     window.show()
     sys.exit(app.exec())

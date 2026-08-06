@@ -2,6 +2,24 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.19] - 2026-07-12
+
+### Adicionado
+* **Controle de Velocidade:** Introduzida nova aba "Velocidade" no painel avançado, permitindo acelerar ou desacelerar (0.1x até 10x) as mídias. Inclui suporte nativo à preservação de tom (Pitch) para evitar distorção de vozes (Efeito Esquilo) e refletindo os resultados diretamente no player ao vivo (MPV).
+* **Injeção de Capa (Cover Art):** Adicionada funcionalidade de embutir imagens (Cover Art) nativamente em exportações de áudio (MP3, OGG, FLAC, M4A). A aba "Marcadores" agora conta com seletor de arquivos de imagem e injeção automática blindada via FFmpeg (-disposition:v).
+* **Menu de Contexto:** Adicionado suporte nativo ao menu "Abrir com..." dos gerenciadores de arquivos do sistema (Nemo, Dolphin, Nautilus, Windows Explorer, etc). Permite selecionar múltiplos arquivos de mídia e enviá-ilos diretamente para a fila de conversão do Lyra-Qt de forma instantânea.
+* **Painel de Vídeo Profissional (Estilo Handbrake):** Reestruturação completa da aba "Vídeo", agora com suporte a injeções cirúrgicas de parâmetros de encoding (Preset, Tune, Profile, Level, Color Range), interface explícita para seleção de VFR/CFR, opções avançadas adicionais (`-x264-params` / `-x265-params`) e suporte integrado ao *Turbo Pass* para acelerar codificações em 2 passadas.
+
+### Alterado
+* **Painel de Opções Avançadas Modernizado:** Devido à proliferação de novas funcionalidades (12 abas no total), o antigo modelo horizontal de guias (`QTabWidget`) foi completamente refatorado. Implantou-se uma arquitetura moderna com um elegante Menu Lateral (`QListWidget`) guiando as telas à direita (`QStackedWidget`). O novo visual expõe botões escondidos e blindou o Layout, abrindo espaço infinito para a adição de novas ferramentas no futuro sem quebras de visualização (UX).
+* **Ergonomia e Largura da Janela:** Reduzida a largura excessiva da janela inicial para se adequar perfeitamente ao reprodutor MPV. Os botões "Converter" e "Parar" foram reagrupados para o lado esquerdo da barra de ferramentas, diminuindo radicalmente a distância do mouse e melhorando a usabilidade.
+
+### Corrigido
+* **Notificações de Sistema Silenciadas (System Tray):** Resolvido o problema onde o término das conversões não exibia a notificação na área de trabalho em ambientes Linux modernos (como GNOME/Wayland). O erro ocorria porque o fallback do comando `notify-send` recebia apenas o nome base do ícone (`-i lyra`). Como o ícone não era integrado globalmente ao tema do SO, o daemon de notificação descartava o pop-up silenciosamente. O problema foi blindado injetando cirurgicamente o caminho absoluto para o arquivo `.svg` que acompanha o projeto.
+* **Regressão de Áudio no Player ao Vivo (MPV):** Resolvido o bug crítico onde a reprodução ao vivo de mídias na aba "Sincronia" ficava completamente silenciada. O problema decorria da injeção da string "yes/no" na biblioteca C do `python-mpv` para controle de tom (Pitch), e foi corrigido adotando a declaração estrita via booleano do Python.
+* **Layout Esmagado:** Aumentada a largura base da janela principal para comportar a crescente expansão das Opções Avançadas, evitando o aparecimento forçado de setas de rolagem e abas ocultas.
+* **Limpeza Incompleta de Configurações:** Corrigida a amnésia do botão "Restaurar Padrões", que ignorava os novos campos do painel de Vídeo (Estilo Handbrake), os 6 campos da aba Marcadores e o campo do Executável do FFmpeg. A rotina interna foi atualizada para expurgar todos os dados injetados pelo usuário, garantindo uma restauração 100% de fábrica.
+
 ## [1.1.18] - 2026-07-10
 
 ### Adicionado
