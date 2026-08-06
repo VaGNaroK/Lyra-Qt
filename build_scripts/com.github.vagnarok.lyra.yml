@@ -81,9 +81,9 @@ modules:
       - make amalg PREFIX=/app
       - make install PREFIX=/app
     sources:
-      - type: archive
-        url: https://github.com/LuaJIT/LuaJIT/archive/refs/tags/v2.1.0-beta3.tar.gz
-        sha256: 409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8
+      - type: git
+        url: https://github.com/LuaJIT/LuaJIT.git
+        commit: 1edc3e52b67eaf6ce5f809be8e17d6862594b8bc
 
   # ----------------------------------------------------------------------------
   # Modulo 2.8: libmpv (Motor de Áudio/Vídeo e Filtros LAVFI)
