@@ -199,6 +199,7 @@ modules:
       - --enable-libvpx
       - --enable-libass
       - --enable-libfreetype
+      - --enable-libwebp
     sources:
       - type: archive
         url: https://ffmpeg.org/releases/ffmpeg-7.0.1.tar.xz
