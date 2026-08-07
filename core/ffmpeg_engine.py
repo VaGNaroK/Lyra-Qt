@@ -894,12 +894,13 @@ class FFmpegEngine(QObject):
             if vfps != "default":
                 fps_mode = adv.get("fps_mode", "vfr") if 'adv' in locals() else "vfr"
                 if fps_mode == "cfr":
-                    cmd.extend(["-vsync", "cfr"])
+                    cmd.extend(["-fps_mode", "cfr"])
+                    if "nvenc" in vcodec: cmd.extend(["-r", str(vfps)])
+                    else: vf_filters.append(f"fps={vfps}")
                 elif fps_mode == "vfr":
-                    cmd.extend(["-vsync", "vfr"])
-                    
-                if "nvenc" in vcodec: cmd.extend(["-r", str(vfps)])
-                else: vf_filters.append(f"fps={vfps}")
+                    cmd.extend(["-fps_mode", "vfr"])
+                    # FFmpeg 7 proíbe o uso de -r ou -fpsmax com -fps_mode vfr
+                    vf_filters.append(f"fps={vfps}")
 
             watermark = options.get("watermark", {})
             if watermark.get("enabled") and watermark.get("image_path") and os.path.exists(watermark["image_path"]):
