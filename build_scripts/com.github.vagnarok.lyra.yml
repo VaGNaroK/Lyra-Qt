@@ -20,7 +20,7 @@ finish-args:
   - --device=dri
   - --share=ipc
   - --share=network
-  - --filesystem=home
+  - --filesystem=host
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.freedesktop.login1
   - --env=QT_QPA_PLATFORM=xcb

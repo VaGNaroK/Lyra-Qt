@@ -2158,7 +2158,13 @@ class LyraMainWindow(QMainWindow):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
     def dropEvent(self, event):
+        from PySide6.QtWidgets import QMessageBox
+        failed_files = []
         for url in event.mimeData().urls():
             file_path = url.toLocalFile()
             if os.path.isfile(file_path):
@@ -2167,3 +2173,9 @@ class LyraMainWindow(QMainWindow):
                 for root, _, files in os.walk(file_path):
                     for file in files:
                         self.add_file_to_table(os.path.join(root, file))
+            else:
+                if file_path:
+                    failed_files.append(file_path)
+                    
+        if failed_files:
+            QMessageBox.warning(self, "Aviso de Permissão", f"Não foi possível acessar {len(failed_files)} arquivo(s) arrastado(s).\nSe você usa Flatpak, tente conceder permissão de leitura para a pasta do arquivo.")
