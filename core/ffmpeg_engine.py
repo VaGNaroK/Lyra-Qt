@@ -779,7 +779,17 @@ class FFmpegEngine(QObject):
             if img_size != "default":
                 width = img_size.split(' ')[0].split('x')[0]
                 vf_filters.append(f"scale={width}:-2")
-            cmd.extend(["-q:v", str(options.get("img_quality", 2))])
+            
+            q_val = options.get("img_quality", 2)
+            if ext_destino == "webp":
+                # WebP usa escala de 0 a 100, onde 100 é a melhor qualidade.
+                # O slider da UI envia de 2 (melhor) a 31 (pior).
+                # Fórmula para converter (2-31) para (100-0).
+                webp_q = max(0, min(100, int(100 - ((q_val - 2) * 100 / 29))))
+                cmd.extend(["-q:v", str(webp_q)])
+            else:
+                cmd.extend(["-q:v", str(q_val)])
+                
             if vf_filters: cmd.extend(["-vf", ",".join(vf_filters)])
 
         elif is_audio_only:

@@ -31,3 +31,9 @@ Você está atuando como um Engenheiro de Software especializado em Python e PyS
 - **Aparência Premium (Dark Theme)**: Use CSS e Emojis (🎵, 🖥️, 🎞️) com abundância para uma UX rica. O tema nativo "Fusion" modificado do PySide6 não deve ser sobrescrito por janelas brancas do SO.
 - **Feedback Constante**: Desabilite botões críticos durante processamentos longos e injete status de carregamento ("Analisando...").
 - **Proteção de Layouts**: Em caso de múltiplas abas (`QTabWidget`), ative `setUsesScrollButtons(True)` para impedir que o acúmulo esprema botões úteis da interface. Use preferencialmente o novo sistema de `QListWidget` com `QStackedWidget` para painéis avançados.
+
+## 7. Obrigatoriedade de Testes Unitários (Test-Driven AI)
+- **Cobertura Contínua**: TODO agente de IA que adicionar uma nova funcionalidade, classe ou método lógico ao projeto DEVE obrigatoriamente criar ou atualizar o teste unitário correspondente no diretório `tests/`.
+- **Validação Pós-Edição**: É ESTRITAMENTE PROIBIDO concluir uma alteração arquitetural, correção de bug ou refatoração sem antes executar a suíte de testes (`venv/bin/pytest`) e garantir que 100% dos testes passam. A IA deve apresentar a saída bem-sucedida do Pytest.
+- **Mocking Obrigatório para UI/Hardware**: Ao testar componentes de interface (PySide6) ou integrações que dependam de renderização em hardware e displays físicos (como o `libmpv`), a IA deve aplicar simulações via `unittest.mock.patch` e usar dependências de GUI Headless (`pytest-qt`). Testes não devem falhar em ambientes CI/CD sem monitor (headless).
+- **Proteção de Motores (`core/`)**: Toda modificação nos motores críticos (`FFmpegEngine`, `YTDLPEngine`) deve ter suas linhas de comandos resultantes testadas em asserções de strings (ex: verificando se as flags corretas como `-hwaccel` ou `-map` foram geradas e anexadas) para impedir regressões na exportação.

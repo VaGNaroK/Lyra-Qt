@@ -22,6 +22,16 @@ O **Lyra Multimedia Converter** é uma interface gráfica (GUI) moderna, modular
 * 📝 **Multiplexação Avançada (MUX):** Injeção de múltiplas trilhas de áudios externos e dezenas de legendas (Softsub) de forma acumulativa, sem perder as faixas originais do contêiner nativo (MKV/MP4).
 * 💾 **Sistema de Presets:** Salve, carregue e gerencie as suas configurações favoritas de renderização com um clique.
 * ⚡ **Arquitetura Assíncrona:** Interface 100% responsiva (não congela) com feedback visual detalhado sobre o progresso, tempo restante e logs em tempo real.
+---
+
+## 🏗️ Arquitetura do Projeto
+
+O Lyra-Qt foi desenhado sob uma arquitetura robusta baseada no **Paradigma MVC (Model-View-Controller)**, com foco extremo em concorrência (Assincronicidade) e separação estrita de responsabilidades. Isso garante que a interface gráfica (GUI) nunca congele, mesmo durante processamentos intensos (como encodes 4K em hardware ou downloads paralelos via yt-dlp).
+
+* 🎨 **Interface (GUI) Isolada**: Toda a construção visual (PySide6) e o gerenciamento de estados (inputs de usuário) ficam contidos exclusivamente na pasta `gui/` (ex: `main_window.py`). A GUI *não* realiza nenhuma lógica bruta de parsing de dados, servindo apenas como controladora.
+* ⚙️ **Motores (Core Engines)**: A lógica pesada de processamento reside na pasta `core/` (`ffmpeg_engine.py`, `ytdlp_engine.py`, `preset_manager.py`). Estes motores funcionam como "Backend" e se comunicam com a Interface de forma segura através do sistema nativo de **Signals e Slots** do Qt, trafegando apenas dados primitivos (dicionários, ints e strings limpas) para evitar falhas de ponteiro (C++).
+* 🔧 **Processamento Nativo Constante (Sem Wrappers)**: O Lyra se recusa a usar wrappers engessados (como `ffmpeg-python`). Ele instila comandos nativos complexos e invoca os binários oficiais do **FFmpeg**, **FFprobe** e **yt-dlp** via `QProcess` e `subprocess`. O progresso é alimentado na interface capturando e realizando leitura ultra-rápida (Regex) de seus `stdouts`/`stderrs`.
+* 🛡️ **Awareness de Sistemas e Sandbox**: O código gerencia de perto as peculiaridades do host, resolvendo dependências automaticamente e alterando dinamicamente o fluxo caso esteja rodando sob Sandboxes blindadas do Linux (ex: restrições Flatpak/Wayland, bypass de MPRIS, injeção de D-Bus) ou diretórios virtuais portáteis (PyInstaller no Windows, via injeção dinâmica no `%PATH%`).
 
 ---
 

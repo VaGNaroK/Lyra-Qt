@@ -5,6 +5,9 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 ## [1.1.20] - 2026-08-06
 
 ### Adicionado
+* **Documentação Arquitetural:** Inserida seção detalhada sobre a arquitetura do projeto no `README.md`, evidenciando a separação do paradigma MVC e o processamento nativo assíncrono.
+* **Testes de Interface (MPV):** Inseridos novos testes unitários rigorosos (`test_mpv_widget.py`) com simulação via Mock (`pytest-qt`), garantindo a integridade dos sinais, filtros de áudio/vídeo (lavfi) e controles de UI independentes do hardware.
+* **Diretrizes de Agentes (AI):** Oficializada a regra de Test-Driven AI no manifesto `AGENTS.md`, blindando o sistema contra regressões e obrigando que agentes artificiais rodem 100% dos testes em cada submissão.
 * **Atalhos de Teclado Globais:** Inseridos atalhos de teclado para as principais ações na tela principal (Ctrl+O para adicionar arquivo, F5 para converter, Esc para parar, Delete para remover, entre outros), melhorando drasticamente a usabilidade (UX).
 * **Barra de Progresso Nativa:** A coluna de "Status" na tabela de conversão agora exibe barras de progresso visuais (`QProgressBar`) completas com micro-animações, abandonando o modelo antigo de textos estáticos de porcentagem.
 * **Logs Estruturados:** Implementado o sistema nativo de logging (`logging.getLogger`) em toda a gerência de Presets, substituindo antigas instruções rudimentares de terminal.
@@ -15,6 +18,7 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 * **Organização e Performance Interna:** Realocadas chamadas isoladas (`import sys`) no topo de módulos essenciais (`ffmpeg_engine.py`), otimizando o carregamento de acordo com a PEP 8.
 
 ### Corrigido
+* **Conversão Destrutiva em WebP:** Corrigido bug crítico no mapeamento de qualidade gráfica para o encoder `libwebp`. O valor inserido na interface (2-31) agora sofre uma conversão reversa escalar exata para a escala proprietária de compactação (100-0) do formato, sanando o problema de gerações acidentais com apenas 2% de qualidade de compressão.
 * **Amnésia e Falha no Diretório de Presets:** Corrigido bug crítico onde perfis salvos em máquinas Windows quebravam ou eram gravados fora do escopo do sistema. A aplicação agora utiliza a pasta nativa `%APPDATA%\Lyra` e engatilha a migração automática segura dos presets remanescentes.
 * **Prevenção de Fila Duplicada:** Blindada a interface gráfica contra sobreposições, ignorando silenciosamente re-inserções de arquivos idênticos na tabela de conversões (insensível a letras maiúsculas/minúsculas no Windows).
 * **Crash em Dicionários:** Corrigido bug (`RuntimeError: dictionary changed size during iteration`) que provocava o desligamento do aplicativo em meio a limpezas de memória (`clear_memory`).
