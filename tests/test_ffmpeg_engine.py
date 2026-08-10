@@ -182,8 +182,9 @@ def test_advanced_video_handbrake_options(engine):
     assert "-color_range" in cmd
     assert cmd[cmd.index("-color_range") + 1] == "tv"
     
-    assert "-vsync" in cmd
-    assert cmd[cmd.index("-vsync") + 1] == "cfr"
+    # 🔒 FIX: FFmpeg 5+ deprecou -vsync em favor de -fps_mode. A engine usa -fps_mode corretamente.
+    assert "-fps_mode" in cmd
+    assert cmd[cmd.index("-fps_mode") + 1] == "cfr"
 
 def test_advanced_video_turbo_pass(engine):
     """

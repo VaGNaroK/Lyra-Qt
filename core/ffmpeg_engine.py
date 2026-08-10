@@ -6,6 +6,11 @@ import subprocess
 import tempfile
 import json
 from PySide6.QtCore import QObject, Signal, QProcess
+from core.utils import (
+    IMAGE_EXTENSIONS, AUDIO_EXTENSIONS, SUBTITLE_EXTENSIONS,
+    format_time_hms as _format_time_util,
+    parse_bitrate_to_kbps as _parse_bitrate_util,
+)
 
 class FFmpegEngine(QObject):
     """
@@ -49,14 +54,13 @@ class FFmpegEngine(QObject):
             if os.path.isfile(local_ffprobe):
                 self.ffprobe_bin = local_ffprobe
 
-    def format_time(self, seconds):
+    def format_time(self, seconds) -> str:
         """
         Converte uma quantidade de segundos brutos para o formato legível HH:MM:SS.
+        Delega para core.utils.format_time_hms para evitar duplicação.
+        O formato HH:MM:SS com 3 grupos é o correto para exibição nos logs de progresso.
         """
-        h = int(seconds // 3600)
-        m = int((seconds % 3600) // 60)
-        s = int(seconds % 60)
-        return f"{h:02}:{m:02}:{s:02}"
+        return _format_time_util(seconds)
 
     def _get_startupinfo(self):
         """
@@ -127,7 +131,7 @@ class FFmpegEngine(QObject):
             out = []
             
             ext_destino = os.path.splitext(file_path)[1].lower().replace(".", "")
-            is_image = ext_destino in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv"]
+            is_image = ext_destino in IMAGE_EXTENSIONS
 
             out.append("📄 INFORMAÇÕES GERAIS")
             format_info = data.get("format", {})
@@ -437,27 +441,17 @@ class FFmpegEngine(QObject):
     def parse_bitrate_to_kbps(self, value):
         """
         Converte strings de bitrate (ex: '2M', '500k') para valores float em kbps.
+        Delega para core.utils.parse_bitrate_to_kbps para evitar duplicação.
         """
-        if not value: return None
-        try:
-            txt = str(value).lower().strip().replace(" ", "")
-            if not txt or txt == "default": return None
-            txt = txt.replace("kbps", "k").replace("mbps", "m").replace("bps", "")
-            if txt.endswith("m"): return int(float(txt[:-1]) * 1000)
-            elif txt.endswith("k"): return int(float(txt[:-1]))
-            else: return int(float(txt))
-        except (ValueError, TypeError):
-            return None
+        return _parse_bitrate_util(value)
 
-    def is_video_format(self, output_file):
+    def is_video_format(self, output_file) -> bool:
         """
-        Verifica se a extensão final é um formato de vídeo genuíno 
-        (exclui puramente imagens, áudios e legendas).
+        Verifica se a extensão final é um formato de vídeo genuíno
+        (exclui imagens, áudios e legendas). Usa constantes de core.utils.
         """
         ext = os.path.splitext(output_file)[1].lower().replace(".", "")
-        return ext not in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv", 
-                           "mp3", "ogg", "wav", "aac", "flac", "wma", "ac3", "opus", "m4a", 
-                           "srt", "ass", "vtt"]
+        return ext not in (IMAGE_EXTENSIONS | AUDIO_EXTENSIONS | SUBTITLE_EXTENSIONS)
 
     def start_conversion(self, row, input_file, output_file, duration, options):
         """
@@ -522,8 +516,6 @@ class FFmpegEngine(QObject):
             self.process_finished.emit(self.current_row, exitCode, False)
 
     def build_ffmpeg_command(self, input_file, output_file, options, pass_num=0):
-        # ✅ FIX: Trabalhar sempre com cópia para evitar mutação do snapshot da fila de lote
-        options = dict(options)
         """
         Gera a linha de comando exata para ser executada pelo binário do FFmpeg.
         Resolve hardware acceleration, codecs, mapeamento de faixas, filtros de vídeo/áudio e afins.
@@ -531,14 +523,16 @@ class FFmpegEngine(QObject):
         Returns:
             list: Array contendo o binário do ffmpeg seguido por todas as flags formatadas.
         """
+        # ✅ FIX: Trabalhar sempre com cópia para evitar mutação do snapshot da fila de lote
+        options = dict(options)
         # 1. Base Configuration
         ffmpeg_bin = options.get("ffmpeg_path", "ffmpeg")
         cmd = [ffmpeg_bin, "-y", "-hide_banner"]
 
         ext_destino = os.path.splitext(output_file)[1].lower().replace(".", "")
-        is_image = ext_destino in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv"]
-        is_audio_only = ext_destino in ["mp3", "ogg", "wav", "aac", "flac", "wma", "ac3", "opus", "m4a"]
-        is_subtitle_only = ext_destino in ["srt", "ass", "vtt"]
+        is_image = ext_destino in IMAGE_EXTENSIONS
+        is_audio_only = ext_destino in AUDIO_EXTENSIONS
+        is_subtitle_only = ext_destino in SUBTITLE_EXTENSIONS
 
         if is_subtitle_only:
             input_ext = os.path.splitext(input_file)[1].lower().replace(".", "")
@@ -998,23 +992,17 @@ class FFmpegEngine(QObject):
             self.process.kill()
 
     def shutdown_pc(self):
-        """Executa o desligamento do computador via sistema operacional ou DBus (Flatpak)"""
-        is_flatpak = "FLATPAK_ID" in os.environ
-        if os.name == 'nt':
-            os.system("shutdown /s /t 0")
-        else:
-            if is_flatpak:
-                subprocess.Popen(["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager.PowerOff", "boolean:true"])
-            else:
-                os.system("systemctl poweroff")
+        """
+        Delegador de compatibilidade — a lógica reside em core.utils.shutdown_pc.
+        Mantido para não quebrar call sites existentes.
+        """
+        from core.utils import shutdown_pc as _shutdown
+        _shutdown()
 
     def suspend_pc(self):
-        """Executa a suspensão do computador via sistema operacional ou DBus (Flatpak)"""
-        is_flatpak = "FLATPAK_ID" in os.environ
-        if os.name == 'nt':
-            os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
-        else:
-            if is_flatpak:
-                subprocess.Popen(["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager.Suspend", "boolean:true"])
-            else:
-                os.system("systemctl suspend")
+        """
+        Delegador de compatibilidade — a lógica reside em core.utils.suspend_pc.
+        Mantido para não quebrar call sites existentes.
+        """
+        from core.utils import suspend_pc as _suspend
+        _suspend()
