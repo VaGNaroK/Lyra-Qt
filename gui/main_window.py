@@ -56,6 +56,7 @@ class LyraMainWindow(QMainWindow):
         self.is_converting = False
         self.is_downloading = False
         self.tray_available = False
+        self._force_quitting = False  # ✅ FIX: declaração explícita evita estado implícito (getattr defensivo)
 
         # ======================================================================
         # ⚙️ INICIALIZAÇÃO DOS MOTORES (CORE)
@@ -194,7 +195,7 @@ class LyraMainWindow(QMainWindow):
         Intercepta o fechamento da janela. Se houver downloads ou conversões ocorrendo,
         pergunta ao usuário se ele realmente quer abortar tudo.
         """
-        if getattr(self, '_force_quitting', False):
+        if self._force_quitting:
             event.accept()
             return
             
@@ -470,6 +471,10 @@ class LyraMainWindow(QMainWindow):
         self.create_info_tab()
         self.create_log_tab()
         
+        # ✅ FIX: adiciona advanced_page ao stack UMA única vez, após todas as abas serem criadas
+        # (antes era chamado 12× dentro de add_advanced_tab, gerando índices extras no stacked_widget)
+        self.stacked_widget.addWidget(self.advanced_page)
+        
         self.advanced_menu.setCurrentRow(0)
         
         self.combo_format.currentTextChanged.connect(self.update_format_locks)
@@ -480,7 +485,6 @@ class LyraMainWindow(QMainWindow):
     def add_advanced_tab(self, tab, title):
         self.advanced_menu.addItem(title)
         self.advanced_stack.addWidget(tab)
-        self.stacked_widget.addWidget(self.advanced_page)
 
     def create_download_page(self):
         """
@@ -2158,7 +2162,13 @@ class LyraMainWindow(QMainWindow):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
     def dropEvent(self, event):
+        from PySide6.QtWidgets import QMessageBox
+        failed_files = []
         for url in event.mimeData().urls():
             file_path = url.toLocalFile()
             if os.path.isfile(file_path):
@@ -2167,3 +2177,9 @@ class LyraMainWindow(QMainWindow):
                 for root, _, files in os.walk(file_path):
                     for file in files:
                         self.add_file_to_table(os.path.join(root, file))
+            else:
+                if file_path:
+                    failed_files.append(file_path)
+                    
+        if failed_files:
+            QMessageBox.warning(self, "Aviso de Permissão", f"Não foi possível acessar {len(failed_files)} arquivo(s) arrastado(s).\nSe você usa Flatpak, tente conceder permissão de leitura para a pasta do arquivo.")

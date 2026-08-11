@@ -4,14 +4,11 @@ import mpv
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel
 from PySide6.QtCore import Qt, QTimer, Signal
 
-def format_time(seconds):
-    if seconds is None:
-        return "00:00"
-    m, s = divmod(int(seconds), 60)
-    h, m = divmod(m, 60)
-    if h > 0:
-        return f"{h:02d}:{m:02d}:{s:02d}"
-    return f"{m:02d}:{s:02d}"
+try:
+    from core.utils import format_time_player as format_time
+except ImportError:
+    # Fallback para execução direta sem o package instalado
+    from utils import format_time_player as format_time
 
 class MPVPlayerWidget(QWidget):
     # Sinais para comunicação thread-safe com o MPV

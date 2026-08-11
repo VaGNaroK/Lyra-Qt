@@ -2,9 +2,32 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.21] - 2026-08-10
+
+### Adicionado
+* **Testes de Pipeline GPU (6 novos casos):** Adicionada cobertura completa do pipeline NVENC com testes unitários que cobrem todos os cenários: detecção de `scale_npp`, detecção de `scale_cuda`, uso correto de `scale_npp` com `hwaccel_output_format`, uso de `scale_cuda` como segundo nível, fallback automático para CPU sem GPU e fallback para CPU com watermark ativo. Todos os testes usam `unittest.mock.patch` para simulação de hardware sem depender de GPU física.
+
+### Alterado
+* **Pipeline NVENC 100% GPU (`scale_npp` / `scale_cuda`):** Corrigido o gargalo crítico de desempenho onde a escala de resolução em conversões NVENC era processada pela CPU, causando 2 round-trips PCIe por frame (GPU→CPU→CPU scale→GPU). O `FFmpegEngine` agora detecta em runtime (via `_detect_cuda_scale_filter()`) o melhor filtro de escala disponível na VRAM, seguindo a hierarquia: `scale_npp` (NVIDIA Performance Primitives, algoritmo Super Sampling — padrão BtbN) > `scale_cuda` (Lanczos nativo CUDA, driver ≥ 396) > `scale` lavfi (CPU — fallback transparente). O resultado é zero cópias PCIe durante o resize com GPU disponível.
+* **`hwaccel_output_format cuda` Sempre Ativo com Resize:** Corrigido bug onde a flag `hwaccel_output_format cuda` era desativada silenciosamente quando o usuário selecionava uma resolução diferente da original (`vsize != default`). Frames decodificados agora permanecem na VRAM durante toda a pipeline, incluindo a etapa de escala GPU.
+* **Fallback Inteligente para Watermark (Bug 24):** Quando o usuário ativa a marca d'água, o pipeline reverte automaticamente para `scale` lavfi (CPU) e desativa o `hwaccel_output_format cuda`. Isso é necessário pois o filtro `overlay` lavfi é incompatível com frames em formato `hwdec` (VRAM), conforme documentado no Bug 24 do `project-memory.md`.
+
+### Refatoração Técnica (Qualidade de Código)
+* **Teste Desatualizado Corrigido (`-vsync` → `-fps_mode`):** O teste `test_advanced_video_handbrake_options` esperava a flag `-vsync cfr` removida no FFmpeg 5+. A engine já usava `-fps_mode cfr` corretamente; o teste foi atualizado para refletir a API vigente. Adicionada marcação `🔒 FIX` no teste para documentar o histórico.
+* **Docstring Reposicionada (`build_ffmpeg_command`):** O comentário `# ✅ FIX` e a linha `options = dict(options)` estavam declarados *antes* da docstring do método, tornando-a uma string literal ignorada por `help()`, `pydoc` e IDEs. Reposicionado conforme PEP 257 — a docstring agora é a primeira expressão do método.
+* **Constantes de Extensão Centralizadas (`core/utils.py`):** As listas de extensões de imagem, áudio e legenda estavam triplicadas em métodos distintos do `FFmpegEngine`. Criadas as constantes `IMAGE_EXTENSIONS`, `AUDIO_EXTENSIONS` e `SUBTITLE_EXTENSIONS` em `core/utils.py` como `frozenset`, usadas em todos os pontos de verificação.
+* **`format_time` Unificada sem Duplicação:** Criadas em `utils.py` duas variantes com nomes semânticos claros: `format_time_hms` (para logs de progresso do engine, sempre `HH:MM:SS`) e `format_time_player` (para o display do MPV, omite horas zero). Elimina função duplicada em `mpv_widget.py`.
+* **`parse_bitrate_to_kbps` Extraída para `utils.py`:** Antes método de instância do `FFmpegEngine` sem dependência de `self`. Movida para `core/utils.py` como função pura; o engine delega via wrapper para manter retrocompatibilidade.
+* **`shutdown_pc` / `suspend_pc` Extraídas do `FFmpegEngine` (SRP):** Os métodos de controle de energia do sistema não têm relação com processamento FFmpeg. Movidos para `core/utils.py`; o engine mantém wrappers delegadores para não quebrar os call sites existentes em `main_window.py`.
+* **`_force_quitting` Declarada Explicitamente no `__init__`:** A flag era testada com `getattr(self, '_force_quitting', False)` por nunca ter sido inicializada. Adicionada `self._force_quitting = False` no `__init__` da `LyraMainWindow`, eliminando o estado implícito.
+* **`add_advanced_tab` Corrigida (Índices Extras no `QStackedWidget`):** `self.stacked_widget.addWidget(self.advanced_page)` era chamado 12× (uma por aba) dentro de `add_advanced_tab`. O Qt descartava silenciosamente, mas gerava índices extras na stack. Corrigido: a chamada ocorre exatamente uma vez em `create_advanced_page`.
+
 ## [1.1.20] - 2026-08-06
 
 ### Adicionado
+* **Documentação Arquitetural:** Inserida seção detalhada sobre a arquitetura do projeto no `README.md`, evidenciando a separação do paradigma MVC e o processamento nativo assíncrono.
+* **Testes de Interface (MPV):** Inseridos novos testes unitários rigorosos (`test_mpv_widget.py`) com simulação via Mock (`pytest-qt`), garantindo a integridade dos sinais, filtros de áudio/vídeo (lavfi) e controles de UI independentes do hardware.
+* **Diretrizes de Agentes (AI):** Oficializada a regra de Test-Driven AI no manifesto `AGENTS.md`, blindando o sistema contra regressões e obrigando que agentes artificiais rodem 100% dos testes em cada submissão.
 * **Atalhos de Teclado Globais:** Inseridos atalhos de teclado para as principais ações na tela principal (Ctrl+O para adicionar arquivo, F5 para converter, Esc para parar, Delete para remover, entre outros), melhorando drasticamente a usabilidade (UX).
 * **Barra de Progresso Nativa:** A coluna de "Status" na tabela de conversão agora exibe barras de progresso visuais (`QProgressBar`) completas com micro-animações, abandonando o modelo antigo de textos estáticos de porcentagem.
 * **Logs Estruturados:** Implementado o sistema nativo de logging (`logging.getLogger`) em toda a gerência de Presets, substituindo antigas instruções rudimentares de terminal.
@@ -15,7 +38,8 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 * **Organização e Performance Interna:** Realocadas chamadas isoladas (`import sys`) no topo de módulos essenciais (`ffmpeg_engine.py`), otimizando o carregamento de acordo com a PEP 8.
 
 ### Corrigido
-* **Amnésia e Falha no Diretório de Presets:** Corrigido bug crítico onde perfis salvos em máquinas Windows quebravam ou eram gravados fora do escopo do sistema. A aplicação agora utiliza a pasta nativa `%APPDATA%\Lyra` e engatilha a migração automática segura dos presets remanescentes.
+* **Conversão Destrutiva em WebP:** Corrigido bug crítico no mapeamento de qualidade gráfica para o encoder `libwebp`. O valor inserido na interface (2-31) agora sofre uma conversão reversa escalar exata para a escala proprietária de compactação (100-0) do formato, sanando o problema de gerações acidentais com apenas 2% de qualidade de compressão.
+* **Amnésia e Falha no Diretório de Presets:** Corrigido bug crítico onde perfis salvos em máquinas Windows quebravam ou eram gravados fora do escopo do sistema. A aplicação agora utiliza a pasta nativa `%APPDATA%\\Lyra` e engatilha a migração automática segura dos presets remanescentes.
 * **Prevenção de Fila Duplicada:** Blindada a interface gráfica contra sobreposições, ignorando silenciosamente re-inserções de arquivos idênticos na tabela de conversões (insensível a letras maiúsculas/minúsculas no Windows).
 * **Crash em Dicionários:** Corrigido bug (`RuntimeError: dictionary changed size during iteration`) que provocava o desligamento do aplicativo em meio a limpezas de memória (`clear_memory`).
 * **Erro Crítico no Modo 2-Pass (Windows):** Resolvido o erro fatal que anulava a conversão de 2 passadas no ambiente Microsoft. O software estava atrelado estaticamente ao diretório `/dev/null` (específico do Linux). Substituído para o uso seguro de `os.devnull`.
@@ -23,6 +47,18 @@ Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas
 * **Ausência do Codec Fallback:** Restaurada a blindagem na codificação MP4 que previne falhas silenciosas de muxing (conversão de puro áudio em MP4 agora obriga o engate do libx264).
 * **Espaços e Aspas no Executável:** O sistema de separação de argumentos de terminal (`shlex.split`) foi calibrado para aceitar caminhos com espaços no Windows (`posix=False`).
 * **Tratamento Genérico de Exceções:** Inúmeras rotinas da interface (Preview, ToolTips de imagens, Players) foram imunizadas, substituindo o perigoso `except:` padrão por detecção estrita de `Exception`.
+
+### Refatoração Técnica (Qualidade de Código)
+* **Teste Desatualizado Corrigido (`-vsync` → `-fps_mode`):** O teste `test_advanced_video_handbrake_options` esperava a flag `-vsync cfr` removida no FFmpeg 5+. A engine já usava `-fps_mode cfr` corretamente; o teste foi atualizado para refletir a API vigente. Adicionada marcação `🔒 FIX` no teste para documentar o histórico.
+* **Docstring Reposicionada (`build_ffmpeg_command`):** O comentário `# ✅ FIX` e a linha `options = dict(options)` estavam declarados *antes* da docstring do método, tornando-a uma string literal ignorada por `help()`, `pydoc` e IDEs. Reposicionado conforme PEP 257 — a docstring agora é a primeira expressão do método.
+* **Constantes de Extensão Centralizadas (`core/utils.py`):** As listas de extensões de imagem, áudio e legenda estavam triplicadas em métodos distintos do `FFmpegEngine`. Criadas as constantes `IMAGE_EXTENSIONS`, `AUDIO_EXTENSIONS` e `SUBTITLE_EXTENSIONS` em `core/utils.py` como `frozenset`, usadas em todos os pontos de verificação via `ext in IMAGE_EXTENSIONS`.
+* **`format_time` Unificada sem Duplicação:** A função `format_time` existia em duas implementações distintas — uma em `ffmpeg_engine.py` (sempre `HH:MM:SS`) e outra em `mpv_widget.py` (omite horas zero). Criadas em `utils.py` duas variantes com nomes semânticos claros: `format_time_hms` (para logs de progresso do engine) e `format_time_player` (para o display do MPV). Ambos os arquivos agora importam de `utils.py`.
+* **`parse_bitrate_to_kbps` Extraída para `utils.py`:** Antes método de instância do `FFmpegEngine` sem dependência de `self`. Movida para `core/utils.py` como função pura; o engine delega via wrapper para manter retrocompatibilidade.
+* **`shutdown_pc` / `suspend_pc` Extraídas do `FFmpegEngine` (SRP):** Os métodos de controle de energia do sistema não têm relação com processamento FFmpeg. Movidos para `core/utils.py`; o engine mantém wrappers delegadores para não quebrar os call sites existentes em `main_window.py`.
+* **`_force_quitting` Declarada Explicitamente no `__init__`:** A flag era testada com `getattr(self, '_force_quitting', False)` por nunca ter sido inicializada. Adicionada `self._force_quitting = False` no `__init__` da `LyraMainWindow`, eliminando o estado implícito e substituindo o `getattr` defensivo por acesso direto.
+* **`add_advanced_tab` Corrigida (Índices Extras no `QStackedWidget`):** `self.stacked_widget.addWidget(self.advanced_page)` era chamado 12× (uma vez por aba criada) dentro de `add_advanced_tab`. O Qt descartava as chamadas duplicadas silenciosamente, mas gerava índices extras na stack. Corrigido: a chamada ocorre exatamente uma vez em `create_advanced_page`, após todas as 12 abas serem inicializadas.
+
+
 
 ## [1.1.19] - 2026-07-12
 

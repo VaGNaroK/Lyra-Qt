@@ -6,6 +6,11 @@ import subprocess
 import tempfile
 import json
 from PySide6.QtCore import QObject, Signal, QProcess
+from core.utils import (
+    IMAGE_EXTENSIONS, AUDIO_EXTENSIONS, SUBTITLE_EXTENSIONS,
+    format_time_hms as _format_time_util,
+    parse_bitrate_to_kbps as _parse_bitrate_util,
+)
 
 class FFmpegEngine(QObject):
     """
@@ -49,14 +54,45 @@ class FFmpegEngine(QObject):
             if os.path.isfile(local_ffprobe):
                 self.ffprobe_bin = local_ffprobe
 
-    def format_time(self, seconds):
+        # Detecta o melhor filtro de escala GPU disponível e cacheia para evitar
+        # subprocess repetitivo durante a fila de conversões.
+        self._cuda_scale_filter = self._detect_cuda_scale_filter()
+
+    def _detect_cuda_scale_filter(self) -> str:
+        """
+        Detecta o melhor filtro de escala na GPU disponível em runtime.
+        Executa `ffmpeg -filters` uma única vez na inicialização e cacheia o resultado.
+
+        Hierarquia de preferência:
+          1. scale_npp  — NVIDIA Performance Primitives, qualidade Super Sampling (BtbN)
+          2. scale_cuda — CUDA nativo, Lanczos na VRAM (driver ≥ 396)
+          3. cpu        — fallback: scale lavfi (comportamento original)
+
+        Returns:
+            str: 'scale_npp' | 'scale_cuda' | 'cpu'
+        """
+        try:
+            result = subprocess.run(
+                [self.ffmpeg_bin, "-hide_banner", "-filters"],
+                capture_output=True, text=True, timeout=5,
+                startupinfo=self._get_startupinfo()
+            )
+            output = result.stdout + result.stderr
+            if "scale_npp" in output:
+                return "scale_npp"
+            if "scale_cuda" in output:
+                return "scale_cuda"
+        except Exception:
+            pass
+        return "cpu"
+
+    def format_time(self, seconds) -> str:
         """
         Converte uma quantidade de segundos brutos para o formato legível HH:MM:SS.
+        Delega para core.utils.format_time_hms para evitar duplicação.
+        O formato HH:MM:SS com 3 grupos é o correto para exibição nos logs de progresso.
         """
-        h = int(seconds // 3600)
-        m = int((seconds % 3600) // 60)
-        s = int(seconds % 60)
-        return f"{h:02}:{m:02}:{s:02}"
+        return _format_time_util(seconds)
 
     def _get_startupinfo(self):
         """
@@ -127,7 +163,7 @@ class FFmpegEngine(QObject):
             out = []
             
             ext_destino = os.path.splitext(file_path)[1].lower().replace(".", "")
-            is_image = ext_destino in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv"]
+            is_image = ext_destino in IMAGE_EXTENSIONS
 
             out.append("📄 INFORMAÇÕES GERAIS")
             format_info = data.get("format", {})
@@ -437,27 +473,17 @@ class FFmpegEngine(QObject):
     def parse_bitrate_to_kbps(self, value):
         """
         Converte strings de bitrate (ex: '2M', '500k') para valores float em kbps.
+        Delega para core.utils.parse_bitrate_to_kbps para evitar duplicação.
         """
-        if not value: return None
-        try:
-            txt = str(value).lower().strip().replace(" ", "")
-            if not txt or txt == "default": return None
-            txt = txt.replace("kbps", "k").replace("mbps", "m").replace("bps", "")
-            if txt.endswith("m"): return int(float(txt[:-1]) * 1000)
-            elif txt.endswith("k"): return int(float(txt[:-1]))
-            else: return int(float(txt))
-        except (ValueError, TypeError):
-            return None
+        return _parse_bitrate_util(value)
 
-    def is_video_format(self, output_file):
+    def is_video_format(self, output_file) -> bool:
         """
-        Verifica se a extensão final é um formato de vídeo genuíno 
-        (exclui puramente imagens, áudios e legendas).
+        Verifica se a extensão final é um formato de vídeo genuíno
+        (exclui imagens, áudios e legendas). Usa constantes de core.utils.
         """
         ext = os.path.splitext(output_file)[1].lower().replace(".", "")
-        return ext not in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv", 
-                           "mp3", "ogg", "wav", "aac", "flac", "wma", "ac3", "opus", "m4a", 
-                           "srt", "ass", "vtt"]
+        return ext not in (IMAGE_EXTENSIONS | AUDIO_EXTENSIONS | SUBTITLE_EXTENSIONS)
 
     def start_conversion(self, row, input_file, output_file, duration, options):
         """
@@ -522,8 +548,6 @@ class FFmpegEngine(QObject):
             self.process_finished.emit(self.current_row, exitCode, False)
 
     def build_ffmpeg_command(self, input_file, output_file, options, pass_num=0):
-        # ✅ FIX: Trabalhar sempre com cópia para evitar mutação do snapshot da fila de lote
-        options = dict(options)
         """
         Gera a linha de comando exata para ser executada pelo binário do FFmpeg.
         Resolve hardware acceleration, codecs, mapeamento de faixas, filtros de vídeo/áudio e afins.
@@ -531,14 +555,16 @@ class FFmpegEngine(QObject):
         Returns:
             list: Array contendo o binário do ffmpeg seguido por todas as flags formatadas.
         """
+        # ✅ FIX: Trabalhar sempre com cópia para evitar mutação do snapshot da fila de lote
+        options = dict(options)
         # 1. Base Configuration
         ffmpeg_bin = options.get("ffmpeg_path", "ffmpeg")
         cmd = [ffmpeg_bin, "-y", "-hide_banner"]
 
         ext_destino = os.path.splitext(output_file)[1].lower().replace(".", "")
-        is_image = ext_destino in ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "webp", "yuv"]
-        is_audio_only = ext_destino in ["mp3", "ogg", "wav", "aac", "flac", "wma", "ac3", "opus", "m4a"]
-        is_subtitle_only = ext_destino in ["srt", "ass", "vtt"]
+        is_image = ext_destino in IMAGE_EXTENSIONS
+        is_audio_only = ext_destino in AUDIO_EXTENSIONS
+        is_subtitle_only = ext_destino in SUBTITLE_EXTENSIONS
 
         if is_subtitle_only:
             input_ext = os.path.splitext(input_file)[1].lower().replace(".", "")
@@ -574,8 +600,18 @@ class FFmpegEngine(QObject):
 
         if not is_image and not is_audio_only and "nvenc" in vcodec:
             cmd.extend(["-hwaccel", "cuda"])
-            vsize_early = options.get("vsize", "default")
-            if vsize_early == "default":
+            # ✅ FIX: Sempre mantém hwaccel_output_format cuda quando há filtro GPU disponível.
+            # Antes era desativado quando havia resize (vsize != default), forçando um
+            # round-trip GPU → CPU → CPU-scale → GPU por cada frame.
+            # scale_cuda/scale_npp operam diretamente na VRAM sem nenhuma cópia PCIe.
+            # O flag é omitido apenas no fallback CPU (filter == 'cpu') para não
+            # quebrar o pipeline quando watermark ou outros filtros lavfi estão ativos.
+            has_watermark = bool(
+                options.get("watermark", {}).get("enabled")
+                and options.get("watermark", {}).get("image_path")
+                and os.path.exists(options["watermark"]["image_path"])
+            )
+            if self._cuda_scale_filter != "cpu" and not has_watermark:
                 cmd.extend(["-hwaccel_output_format", "cuda"])
 
         # 1.5 Cortes Temporais (Trimming)
@@ -779,7 +815,17 @@ class FFmpegEngine(QObject):
             if img_size != "default":
                 width = img_size.split(' ')[0].split('x')[0]
                 vf_filters.append(f"scale={width}:-2")
-            cmd.extend(["-q:v", str(options.get("img_quality", 2))])
+            
+            q_val = options.get("img_quality", 2)
+            if ext_destino == "webp":
+                # WebP usa escala de 0 a 100, onde 100 é a melhor qualidade.
+                # O slider da UI envia de 2 (melhor) a 31 (pior).
+                # Fórmula para converter (2-31) para (100-0).
+                webp_q = max(0, min(100, int(100 - ((q_val - 2) * 100 / 29))))
+                cmd.extend(["-q:v", str(webp_q)])
+            else:
+                cmd.extend(["-q:v", str(q_val)])
+                
             if vf_filters: cmd.extend(["-vf", ",".join(vf_filters)])
 
         elif is_audio_only:
@@ -882,24 +928,37 @@ class FFmpegEngine(QObject):
                 orig_w, orig_h = self.get_video_resolution(input_file)
                 if orig_w > 0 and orig_h > 0 and orig_h > orig_w and target_w > target_h:
                     target_w, target_h = target_h, target_w
-                if "nvenc" in vcodec:
+
+                if "nvenc" in vcodec and self._cuda_scale_filter != "cpu" and not has_watermark:
+                    # ✅ FIX: Pipeline de escala 100% GPU — zero cópias PCIe.
+                    # Bug histórico: scale lavfi forçava GPU→CPU→CPU-scale→GPU por frame.
+                    # scale_npp usa Super Sampling (melhor qualidade); scale_cuda usa Lanczos CUDA.
+                    # A altura é calculada explicitamente (múltiplo par) para compatibilidade
+                    # com versões antigas do FFmpeg que não suportam -2 em filtros CUDA.
+                    # Watermark desativa o caminho GPU — bug 24 do project-memory:
+                    # overlay lavfi (CPU) é incompatível com hwdec auto-safe.
                     if orig_w > 0 and orig_h > 0:
                         calculated_h = int((target_w * orig_h) / orig_w)
-                        target_h = calculated_h + 1 if calculated_h % 2 != 0 else calculated_h
-                    vf_filters.append(f"scale={target_w}:{target_h}:flags=lanczos")
+                        target_h = calculated_h + (calculated_h % 2)  # garante múltiplo par
+                    if self._cuda_scale_filter == "scale_npp":
+                        vf_filters.append(f"scale_npp={target_w}:{target_h}:interp=super")
+                    else:  # scale_cuda
+                        vf_filters.append(f"scale_cuda={target_w}:{target_h}:interp_algo=lanczos")
                 else:
+                    # Fallback CPU: comportamento original (watermark ativo ou GPU indisponível)
                     vf_filters.append(f"scale={target_w}:-2:flags=lanczos,setsar=1")
 
             vfps = options.get("vfps", "default")
             if vfps != "default":
                 fps_mode = adv.get("fps_mode", "vfr") if 'adv' in locals() else "vfr"
                 if fps_mode == "cfr":
-                    cmd.extend(["-vsync", "cfr"])
+                    cmd.extend(["-fps_mode", "cfr"])
+                    if "nvenc" in vcodec: cmd.extend(["-r", str(vfps)])
+                    else: vf_filters.append(f"fps={vfps}")
                 elif fps_mode == "vfr":
-                    cmd.extend(["-vsync", "vfr"])
-                    
-                if "nvenc" in vcodec: cmd.extend(["-r", str(vfps)])
-                else: vf_filters.append(f"fps={vfps}")
+                    cmd.extend(["-fps_mode", "vfr"])
+                    # FFmpeg 7 proíbe o uso de -r ou -fpsmax com -fps_mode vfr
+                    vf_filters.append(f"fps={vfps}")
 
             watermark = options.get("watermark", {})
             if watermark.get("enabled") and watermark.get("image_path") and os.path.exists(watermark["image_path"]):
@@ -987,23 +1046,17 @@ class FFmpegEngine(QObject):
             self.process.kill()
 
     def shutdown_pc(self):
-        """Executa o desligamento do computador via sistema operacional ou DBus (Flatpak)"""
-        is_flatpak = "FLATPAK_ID" in os.environ
-        if os.name == 'nt':
-            os.system("shutdown /s /t 0")
-        else:
-            if is_flatpak:
-                subprocess.Popen(["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager.PowerOff", "boolean:true"])
-            else:
-                os.system("systemctl poweroff")
+        """
+        Delegador de compatibilidade — a lógica reside em core.utils.shutdown_pc.
+        Mantido para não quebrar call sites existentes.
+        """
+        from core.utils import shutdown_pc as _shutdown
+        _shutdown()
 
     def suspend_pc(self):
-        """Executa a suspensão do computador via sistema operacional ou DBus (Flatpak)"""
-        is_flatpak = "FLATPAK_ID" in os.environ
-        if os.name == 'nt':
-            os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
-        else:
-            if is_flatpak:
-                subprocess.Popen(["dbus-send", "--system", "--print-reply", "--dest=org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager.Suspend", "boolean:true"])
-            else:
-                os.system("systemctl suspend")
+        """
+        Delegador de compatibilidade — a lógica reside em core.utils.suspend_pc.
+        Mantido para não quebrar call sites existentes.
+        """
+        from core.utils import suspend_pc as _suspend
+        _suspend()
