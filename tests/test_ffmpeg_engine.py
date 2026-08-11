@@ -207,3 +207,172 @@ def test_advanced_video_turbo_pass(engine):
     cmd2 = engine.build_ffmpeg_command("input.mp4", "output.mp4", options, pass_num=2)
     assert "-preset" in cmd2
     assert cmd2[cmd2.index("-preset") + 1] == "veryslow" # Preset original restaurado
+
+
+# ==============================================================================
+# Testes do Pipeline GPU — scale_cuda / scale_npp / fallback CPU
+# ==============================================================================
+
+def test_detect_cuda_scale_filter_parses_npp(monkeypatch):
+    """
+    Testa que _detect_cuda_scale_filter retorna 'scale_npp' quando
+    o output de `ffmpeg -filters` contém a string 'scale_npp'.
+    """
+    import subprocess
+    from unittest.mock import MagicMock
+
+    mock_result = MagicMock()
+    mock_result.stdout = "... scale_npp ... scale_cuda ..."
+    mock_result.stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: mock_result)
+    # Cria engine com detecção mockada
+    engine = FFmpegEngine(resource_dir="/tmp/mock_dir")
+    # Re-executa manualmente para testar o método isolado
+    result = engine._detect_cuda_scale_filter()
+    assert result == "scale_npp", "scale_npp deve ter prioridade sobre scale_cuda"
+
+
+def test_detect_cuda_scale_filter_parses_cuda_only(monkeypatch):
+    """
+    Testa que _detect_cuda_scale_filter retorna 'scale_cuda' quando
+    apenas scale_cuda está disponível (sem scale_npp).
+    """
+    import subprocess
+    from unittest.mock import MagicMock
+
+    mock_result = MagicMock()
+    mock_result.stdout = "... scale_cuda ..."
+    mock_result.stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: mock_result)
+    engine = FFmpegEngine(resource_dir="/tmp/mock_dir")
+    result = engine._detect_cuda_scale_filter()
+    assert result == "scale_cuda"
+
+
+def test_nvenc_scale_uses_scale_npp(engine):
+    """
+    Testa que com _cuda_scale_filter='scale_npp', o bloco de resize NVENC
+    injeta scale_npp no -vf e mantém -hwaccel_output_format cuda.
+    Verifica também que NÃO usa scale= lavfi (CPU).
+    """
+    from unittest.mock import patch
+
+    engine._cuda_scale_filter = "scale_npp"
+
+    options = {
+        "vcodec": "h264_nvenc",
+        "vsize": "1920x1080",
+    }
+
+    with patch.object(engine, "get_video_resolution", return_value=(3840, 2160)):
+        cmd = engine.build_ffmpeg_command("input.mp4", "output.mp4", options)
+
+    cmd_str = " ".join(cmd)
+
+    # 🔒 FIX: hwaccel_output_format deve estar presente mesmo com resize
+    assert "-hwaccel_output_format" in cmd
+    assert cmd[cmd.index("-hwaccel_output_format") + 1] == "cuda"
+
+    # Filtro GPU deve ser scale_npp
+    assert "scale_npp=1920:" in cmd_str
+    assert "interp=super" in cmd_str
+
+    # NÃO deve usar scale= lavfi (CPU)
+    assert "scale=1920" not in cmd_str
+    assert "flags=lanczos" not in cmd_str
+
+
+def test_nvenc_scale_uses_scale_cuda_fallback(engine):
+    """
+    Testa que com _cuda_scale_filter='scale_cuda', o bloco de resize NVENC
+    injeta scale_cuda no -vf com interp_algo=lanczos.
+    """
+    from unittest.mock import patch
+
+    engine._cuda_scale_filter = "scale_cuda"
+
+    options = {
+        "vcodec": "h264_nvenc",
+        "vsize": "1280x720",
+    }
+
+    with patch.object(engine, "get_video_resolution", return_value=(1920, 1080)):
+        cmd = engine.build_ffmpeg_command("input.mp4", "output.mp4", options)
+
+    cmd_str = " ".join(cmd)
+
+    assert "scale_cuda=1280:" in cmd_str
+    assert "interp_algo=lanczos" in cmd_str
+    assert "flags=lanczos" not in cmd_str
+
+
+def test_nvenc_scale_cpu_fallback_when_gpu_unavailable(engine):
+    """
+    Testa que com _cuda_scale_filter='cpu', o sistema cai de volta
+    para scale= lavfi e NÃO injeta -hwaccel_output_format cuda.
+    Cobre o cenário de máquinas sem GPU ou FFmpeg sem CUDA.
+    """
+    from unittest.mock import patch
+
+    engine._cuda_scale_filter = "cpu"
+
+    options = {
+        "vcodec": "h264_nvenc",
+        "vsize": "1280x720",
+    }
+
+    with patch.object(engine, "get_video_resolution", return_value=(1920, 1080)):
+        cmd = engine.build_ffmpeg_command("input.mp4", "output.mp4", options)
+
+    cmd_str = " ".join(cmd)
+
+    # Sem GPU, não deve ter hwaccel_output_format
+    assert "-hwaccel_output_format" not in cmd
+
+    # Deve usar scale= lavfi (CPU) como fallback
+    assert "scale=" in cmd_str
+    assert "flags=lanczos" in cmd_str
+
+    # NÃO deve usar filtros GPU
+    assert "scale_cuda" not in cmd_str
+    assert "scale_npp" not in cmd_str
+
+
+def test_nvenc_scale_cpu_fallback_when_watermark_active(engine, tmp_path):
+    """
+    Testa que mesmo com GPU disponível, o sistema desativa hwaccel_output_format
+    e usa scale= CPU quando watermark está ativo.
+    🔒 FIX: Bug 24 do project-memory — overlay (CPU) é incompatível com hwdec GPU.
+    """
+    from unittest.mock import patch
+
+    engine._cuda_scale_filter = "scale_npp"
+
+    mock_image = tmp_path / "logo.png"
+    mock_image.write_text("fake")
+
+    options = {
+        "vcodec": "h264_nvenc",
+        "vsize": "1280x720",
+        "watermark": {
+            "enabled": True,
+            "image_path": str(mock_image),
+            "position": "Inferior direito",
+            "size": 50,
+            "opacity": 80,
+        },
+    }
+
+    with patch.object(engine, "get_video_resolution", return_value=(1920, 1080)):
+        cmd = engine.build_ffmpeg_command("input.mp4", "output.mp4", options)
+
+    # Com watermark ativo, hwaccel_output_format NÃO deve estar presente
+    assert "-hwaccel_output_format" not in cmd
+
+    # scale= CPU deve ser usado (compatível com overlay lavfi)
+    cmd_str = " ".join(cmd)
+    assert "scale=" in cmd_str
+    assert "flags=lanczos" in cmd_str
+    assert "scale_npp" not in cmd_str

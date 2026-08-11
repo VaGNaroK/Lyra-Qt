@@ -54,6 +54,38 @@ class FFmpegEngine(QObject):
             if os.path.isfile(local_ffprobe):
                 self.ffprobe_bin = local_ffprobe
 
+        # Detecta o melhor filtro de escala GPU disponível e cacheia para evitar
+        # subprocess repetitivo durante a fila de conversões.
+        self._cuda_scale_filter = self._detect_cuda_scale_filter()
+
+    def _detect_cuda_scale_filter(self) -> str:
+        """
+        Detecta o melhor filtro de escala na GPU disponível em runtime.
+        Executa `ffmpeg -filters` uma única vez na inicialização e cacheia o resultado.
+
+        Hierarquia de preferência:
+          1. scale_npp  — NVIDIA Performance Primitives, qualidade Super Sampling (BtbN)
+          2. scale_cuda — CUDA nativo, Lanczos na VRAM (driver ≥ 396)
+          3. cpu        — fallback: scale lavfi (comportamento original)
+
+        Returns:
+            str: 'scale_npp' | 'scale_cuda' | 'cpu'
+        """
+        try:
+            result = subprocess.run(
+                [self.ffmpeg_bin, "-hide_banner", "-filters"],
+                capture_output=True, text=True, timeout=5,
+                startupinfo=self._get_startupinfo()
+            )
+            output = result.stdout + result.stderr
+            if "scale_npp" in output:
+                return "scale_npp"
+            if "scale_cuda" in output:
+                return "scale_cuda"
+        except Exception:
+            pass
+        return "cpu"
+
     def format_time(self, seconds) -> str:
         """
         Converte uma quantidade de segundos brutos para o formato legível HH:MM:SS.
@@ -568,8 +600,18 @@ class FFmpegEngine(QObject):
 
         if not is_image and not is_audio_only and "nvenc" in vcodec:
             cmd.extend(["-hwaccel", "cuda"])
-            vsize_early = options.get("vsize", "default")
-            if vsize_early == "default":
+            # ✅ FIX: Sempre mantém hwaccel_output_format cuda quando há filtro GPU disponível.
+            # Antes era desativado quando havia resize (vsize != default), forçando um
+            # round-trip GPU → CPU → CPU-scale → GPU por cada frame.
+            # scale_cuda/scale_npp operam diretamente na VRAM sem nenhuma cópia PCIe.
+            # O flag é omitido apenas no fallback CPU (filter == 'cpu') para não
+            # quebrar o pipeline quando watermark ou outros filtros lavfi estão ativos.
+            has_watermark = bool(
+                options.get("watermark", {}).get("enabled")
+                and options.get("watermark", {}).get("image_path")
+                and os.path.exists(options["watermark"]["image_path"])
+            )
+            if self._cuda_scale_filter != "cpu" and not has_watermark:
                 cmd.extend(["-hwaccel_output_format", "cuda"])
 
         # 1.5 Cortes Temporais (Trimming)
@@ -886,12 +928,24 @@ class FFmpegEngine(QObject):
                 orig_w, orig_h = self.get_video_resolution(input_file)
                 if orig_w > 0 and orig_h > 0 and orig_h > orig_w and target_w > target_h:
                     target_w, target_h = target_h, target_w
-                if "nvenc" in vcodec:
+
+                if "nvenc" in vcodec and self._cuda_scale_filter != "cpu" and not has_watermark:
+                    # ✅ FIX: Pipeline de escala 100% GPU — zero cópias PCIe.
+                    # Bug histórico: scale lavfi forçava GPU→CPU→CPU-scale→GPU por frame.
+                    # scale_npp usa Super Sampling (melhor qualidade); scale_cuda usa Lanczos CUDA.
+                    # A altura é calculada explicitamente (múltiplo par) para compatibilidade
+                    # com versões antigas do FFmpeg que não suportam -2 em filtros CUDA.
+                    # Watermark desativa o caminho GPU — bug 24 do project-memory:
+                    # overlay lavfi (CPU) é incompatível com hwdec auto-safe.
                     if orig_w > 0 and orig_h > 0:
                         calculated_h = int((target_w * orig_h) / orig_w)
-                        target_h = calculated_h + 1 if calculated_h % 2 != 0 else calculated_h
-                    vf_filters.append(f"scale={target_w}:{target_h}:flags=lanczos")
+                        target_h = calculated_h + (calculated_h % 2)  # garante múltiplo par
+                    if self._cuda_scale_filter == "scale_npp":
+                        vf_filters.append(f"scale_npp={target_w}:{target_h}:interp=super")
+                    else:  # scale_cuda
+                        vf_filters.append(f"scale_cuda={target_w}:{target_h}:interp_algo=lanczos")
                 else:
+                    # Fallback CPU: comportamento original (watermark ativo ou GPU indisponível)
                     vf_filters.append(f"scale={target_w}:-2:flags=lanczos,setsar=1")
 
             vfps = options.get("vfps", "default")
