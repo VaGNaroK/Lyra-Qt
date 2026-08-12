@@ -288,3 +288,24 @@ O motor extrairá as marcações de interface para forjar os argumentos:
 * **Preset, Tune, Profile, Level:** Conectados nas respectivas propriedades puras: `-preset`, `-tune`, `-profile:v`, `-level`.
 * **Turbo Pass e 2-Pass:** Mapear a passagem 1 com `-fastfirstpass 1` ou forçando `-preset ultrafast` somado à supressão temporal para turbinar o _log creation_.
 * **Opções Adicionais:** Flag nativa `-x264-params` sendo repassada com segurança caso codec seja compatível.
+
+---
+
+# [TODO] Instalador Windows Nativo com Inno Setup (`Setup.exe`)
+
+**Objetivo:** Automatizar a criação de um instalador executável oficial para Windows (`Lyra-Qt-Windows-Setup-vX.Y.Z.exe`) além do pacote portátil em arquivo `.zip` já existente.
+
+## 1. Criar Script de Instalação (`build_scripts/setup.iss`)
+- Configurar diretório de destino padrão em `{autopf}\Lyra Multimedia Converter`.
+- Injetar ícone da aplicação (`assets/icons/lyra.ico`).
+- Criar atalhos automáticos no Menu Iniciar e na Área de Trabalho (opcional).
+- Adicionar registro limpo de desinstalação no "Adicionar ou Remover Programas" do Windows.
+
+## 2. Integração com o Script de Build (`build_scripts/build_windows.ps1`)
+- Detectar o compilador do Inno Setup (`iscc.exe`).
+- Executar a compilação do `setup.iss` após o término do PyInstaller, gerando a pasta `dist` com o instalador final.
+
+## 3. Integração com CI/CD (`.github/workflows/ci-cd.yml`)
+- Adicionar a etapa `choco install innosetup -y` no runner Windows (`build-windows`).
+- Atualizar o artefato do Windows para incluir tanto o `.zip` quanto o `Setup.exe` gerado.
+
