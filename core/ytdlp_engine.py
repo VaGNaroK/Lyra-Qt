@@ -24,22 +24,17 @@ class YTDLPEngine(QObject):
         if sys.platform == "win32":
             self.ytdlp_bin = os.path.join(self.resource_dir, "assets", "bin", "yt-dlp.exe")
         else:
-            # Verifica se há um yt-dlp no mesmo diretório do Python atual (ex: dentro do venv)
+            # 🔒 FIX: Prioriza o yt-dlp no venv em execução ou no diretório de recursos antes do PATH global
             venv_ytdlp = os.path.join(os.path.dirname(sys.executable), "yt-dlp")
+            local_venv_ytdlp = os.path.join(self.resource_dir, "venv", "bin", "yt-dlp")
             if os.path.isfile(venv_ytdlp):
                 self.ytdlp_bin = venv_ytdlp
+            elif os.path.isfile(local_venv_ytdlp):
+                self.ytdlp_bin = local_venv_ytdlp
             else:
                 self.ytdlp_bin = "yt-dlp"
 
     def start_download(self, url: str, dest_path: str, mode: int, options: dict):
-        # ✅ FIX: Validar URL antes de passar para o yt-dlp
-        from urllib.parse import urlparse
-        parsed = urlparse(url.strip())
-        if parsed.scheme not in ("http", "https"):
-            self.error_occurred.emit(
-                f"URL inválida: apenas URLs http/https são permitidas. Recebido: '{url[:60]}'"
-            )
-            return
         """
         Inicia o download de uma URL com os parâmetros especificados pelo usuário.
         
@@ -49,6 +44,14 @@ class YTDLPEngine(QObject):
             mode (int): Modo de download (0 para Vídeo, 1 para Áudio).
             options (dict): Dicionário contendo filtros e formatos (resolução, bitrate, etc).
         """
+        # ✅ FIX: Validar URL antes de passar para o yt-dlp
+        from urllib.parse import urlparse
+        parsed = urlparse(url.strip())
+        if parsed.scheme not in ("http", "https"):
+            self.error_occurred.emit(
+                f"URL inválida: apenas URLs http/https são permitidas. Recebido: '{url[:60]}'"
+            )
+            return
         self.process = QProcess(self)
         cmd = [self.ytdlp_bin, "--newline", "--ignore-errors", "--no-playlist", "-o", os.path.join(dest_path, "%(title)s.%(ext)s")]
 

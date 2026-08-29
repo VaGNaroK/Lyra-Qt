@@ -2,6 +2,16 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.22] - 2026-08-28
+
+### Adicionado
+* **Testes de Validação e Resolução do yt-dlp:** Adicionados novos testes unitários em `tests/test_ytdlp_engine.py` cobrindo a validação preventiva de URLs inválidas (sem scheme http/https) e a resolução correta dos binários do `yt-dlp` em ambientes Linux e Windows.
+
+### Alterado
+* **Atualização do Motor yt-dlp (`2026.08.19`):** Atualizada a dependência do `yt-dlp` para a versão mais recente oficial, contornando bloqueios do YouTube (desafios JS/nsig e erros HTTP 403).
+* **Resolução Blindada do Binário (`🔒 FIX`):** O `YTDLPEngine` agora prioriza explicitamente o executável `yt-dlp` presente no ambiente virtual (`sys.executable` e `resource_dir/venv/bin/yt-dlp`), prevenindo que pacotes obsoletos do sistema operacional (como APT) sejam acionados acidentalmente.
+* **Docstring Reposicionada (`start_download`):** Corrigido posicionamento da docstring no método `start_download` em conformidade com a PEP 257.
+
 ## [1.1.21] - 2026-08-10
 
 ### Adicionado

@@ -63,3 +63,45 @@ def test_start_download_video(ytdlp, monkeypatch):
     assert "--merge-output-format" in args
     assert "mkv" in args
     assert "-x" not in args
+
+def test_start_download_invalid_url(ytdlp, monkeypatch):
+    """
+    Testa se URLs inválidas (sem http/https) emitem erro e não iniciam processo.
+    """
+    started = False
+    def mock_start(self):
+        nonlocal started
+        started = True
+        
+    monkeypatch.setattr(QProcess, "start", mock_start)
+    
+    erros = []
+    ytdlp.error_occurred.connect(erros.append)
+    
+    ytdlp.start_download(
+        url="ftp://invalid.com/file.mp4",
+        dest_path="/tmp/out",
+        mode=0,
+        options={}
+    )
+    
+    assert not started
+    assert len(erros) == 1
+    assert "URL inválida" in erros[0]
+
+def test_ytdlp_bin_resolution(monkeypatch):
+    """
+    Testa a resolução de caminhos do binário do yt-dlp em Linux/Windows.
+    """
+    import sys
+    # Simula Windows
+    monkeypatch.setattr(sys, "platform", "win32")
+    engine_win = YTDLPEngine(resource_dir="/app")
+    assert engine_win.ytdlp_bin == os.path.join("/app", "assets", "bin", "yt-dlp.exe")
+    
+    # Simula Linux com fallback
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(os.path, "isfile", lambda p: False)
+    engine_linux = YTDLPEngine(resource_dir="/app")
+    assert engine_linux.ytdlp_bin == "yt-dlp"
+
