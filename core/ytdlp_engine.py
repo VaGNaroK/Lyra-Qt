@@ -59,10 +59,14 @@ class YTDLPEngine(QObject):
             cmd.extend(["-x", "--audio-format", options.get("a_fmt", "mp3"), "--audio-quality", options.get("a_bitrate", "128K")])
         else:
             fmt = options.get("v_fmt", "mp4")
-            res_text = options.get("v_res", "Melhor Disponível")
+            res_text = str(options.get("v_res", "best"))
             height_map = {
-                "Melhor Disponível": "", "2160p (4K)": "[height<=2160]", "1440p (QuadHD)": "[height<=1440]",
-                "1080p (FullHD)": "[height<=1080]", "720p (HD)": "[height<=720]", "480p (SD)": "[height<=480]"
+                "best": "", "Melhor Disponível": "", "Best Available": "",
+                "2160": "[height<=2160]", "2160p": "[height<=2160]", "2160p (4K)": "[height<=2160]",
+                "1440": "[height<=1440]", "1440p": "[height<=1440]", "1440p (QuadHD)": "[height<=1440]",
+                "1080": "[height<=1080]", "1080p": "[height<=1080]", "1080p (FullHD)": "[height<=1080]",
+                "720": "[height<=720]", "720p": "[height<=720]", "720p (HD)": "[height<=720]",
+                "480": "[height<=480]", "480p": "[height<=480]", "480p (SD)": "[height<=480]"
             }
             res_filter = height_map.get(res_text, "")
             format_str = f"bestvideo{res_filter}+bestaudio/best{res_filter}"

@@ -1,6 +1,13 @@
 import os
 import locale
-import mpv
+
+try:
+    import mpv
+    MPV_AVAILABLE = True
+except Exception as e:
+    mpv = None
+    MPV_AVAILABLE = False
+
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel
 from PySide6.QtCore import Qt, QTimer, Signal
 
@@ -75,6 +82,11 @@ class MPVPlayerWidget(QWidget):
         QTimer.singleShot(100, self.init_mpv)
 
     def init_mpv(self):
+        if not MPV_AVAILABLE or mpv is None:
+            self.mpv = None
+            self.play_btn.setEnabled(False)
+            return
+
         import sys
 
         is_flatpak = "FLATPAK_ID" in os.environ
@@ -128,6 +140,8 @@ class MPVPlayerWidget(QWidget):
 
         except Exception as e:
             print(f"CRITICAL ERROR IN MPV INITIALIZATION: {e}")
+            self.mpv = None
+            self.play_btn.setEnabled(False)
 
     # --- Slots de Atualização da UI ---
     def update_time_ui(self, value):
@@ -169,7 +183,7 @@ class MPVPlayerWidget(QWidget):
 
     # --- API Original do Player ---
     def play(self, filepath):
-        if os.path.exists(filepath):
+        if self.mpv and os.path.exists(filepath):
             self.mpv.pause = True
             self.mpv.play(filepath)
 
@@ -253,13 +267,18 @@ class MPVPlayerWidget(QWidget):
         escaped_img = watermark["image_path"].replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
         size_factor = watermark.get("size", 100) / 100.0
         opacity = watermark.get("opacity", 100) / 100.0
-        pos = watermark.get("position", "Inferior direito")
+        pos = watermark.get("position", "bottom_right")
         
-        if pos == "Superior esquerdo": x, y = "10", "10"
-        elif pos == "Superior direito": x, y = "W-w-10", "10"
-        elif pos == "Centro": x, y = "(W-w)/2", "(H-h)/2"
-        elif pos == "Inferior esquerdo": x, y = "10", "H-h-10"
-        else: x, y = "W-w-10", "H-h-10"
+        if pos in ("Superior esquerdo", "top_left", "Top-Left", "En haut à gauche", "Oben links", "In alto a sinistra", "Вверху слева", "左上角", "左上", "Superior izquierda"):
+            x, y = "10", "10"
+        elif pos in ("Superior direito", "top_right", "Top-Right", "En haut à droite", "Oben rechts", "In alto a destra", "Вверху справа", "右上角", "右上", "Superior derecha"):
+            x, y = "W-w-10", "10"
+        elif pos in ("Centro", "center", "Center", "Centre", "Mitte", "По центру", "居中", "中央"):
+            x, y = "(W-w)/2", "(H-h)/2"
+        elif pos in ("Inferior esquerdo", "bottom_left", "Bottom-Left", "En bas à gauche", "Unten links", "In basso a sinistra", "Внизу слева", "左下角", "左下", "Inferior izquierda"):
+            x, y = "10", "H-h-10"
+        else: # "Inferior direito", "bottom_right", etc.
+            x, y = "W-w-10", "H-h-10"
         
         wm_setup = f"movie='{escaped_img}',format=rgba[wm];[wm]scale=iw*{size_factor}:ih*{size_factor},colorchannelmixer=aa={opacity}[wm_mod]"
         final_vf = f"{wm_setup};[in][wm_mod]overlay={x}:{y}"

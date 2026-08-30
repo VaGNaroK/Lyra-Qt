@@ -35,26 +35,37 @@ RESOURCE_DIR = _resolve_resource_dir()
 # 🔒 INJEÇÃO DE DLL PATH (CRÍTICO PARA WINDOWS)
 # O pacote python-mpv exige que a DLL (mpv-1.dll ou mpv-2.dll) esteja no %PATH% do sistema
 # antes do próprio módulo ser importado. Aqui nós garantimos que a pasta 'assets/bin' 
-# (onde guardamos o mpv-2.dll) seja exposta para o ambiente.
-assets_bin_path = os.path.join(RESOURCE_DIR, "assets", "bin")
-if os.path.exists(assets_bin_path):
-    os.environ["PATH"] = assets_bin_path + os.pathsep + os.environ.get("PATH", "")
-    # Em Python 3.8+ no Windows, é necessário usar add_dll_directory para que o ctypes encontre as dependências da DLL
-    if hasattr(os, 'add_dll_directory'):
-        try:
-            os.add_dll_directory(assets_bin_path)
-        except Exception:
-            pass
-
-    # 🔒 MITIGAÇÃO: Remover o "Mark of the Web" para evitar o WinError 1114 no carregamento via ctypes
-    if sys.platform == "win32":
-        try:
-            for filename in os.listdir(assets_bin_path):
-                zone_id_path = os.path.join(assets_bin_path, filename) + ":Zone.Identifier"
-                if os.path.exists(zone_id_path):
-                    os.remove(zone_id_path)
-        except Exception:
-            pass
+# e a raiz da aplicação empacotada sejam expostas para o ambiente.
+if sys.platform == "win32":
+    import ctypes
+    possible_dll_dirs = [
+        os.path.join(RESOURCE_DIR, "assets", "bin"),
+        RESOURCE_DIR,
+        os.path.dirname(sys.executable),
+        os.path.join(os.path.dirname(sys.executable), "assets", "bin"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "bin")
+    ]
+    for d in possible_dll_dirs:
+        if d and os.path.isdir(d):
+            os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+            if hasattr(os, 'add_dll_directory'):
+                try:
+                    os.add_dll_directory(d)
+                except Exception:
+                    pass
+            try:
+                ctypes.windll.kernel32.SetDllDirectoryW(d)
+            except Exception:
+                pass
+            
+            # 🔒 MITIGAÇÃO: Remover o "Mark of the Web" para evitar o WinError 1114 no carregamento via ctypes
+            try:
+                for filename in os.listdir(d):
+                    zone_id_path = os.path.join(d, filename) + ":Zone.Identifier"
+                    if os.path.exists(zone_id_path):
+                        os.remove(zone_id_path)
+            except Exception:
+                pass
 # ==============================================================================
 # 🔒 INJEÇÃO DE CUDA PATH (CRÍTICO PARA LINUX VENV)
 # Garante que as bibliotecas da NVIDIA instaladas via pip sejam carregadas no ONNX
@@ -78,13 +89,16 @@ if sys.platform.startswith('linux'):
                 os.environ["LYRA_CUDA_INJECTED"] = "1"
                 os.execv(sys.executable, [sys.executable] + sys.argv)
 
-# Importação segura da GUI
+# Importação segura da GUI e do motor de internacionalização
 try:
     from gui.main_window import LyraMainWindow
+    from core.i18n import i18n
 except ImportError:
     from main_window import LyraMainWindow
+    from i18n import i18n
 
 if __name__ == "__main__":
+    i18n.reinit_resource_dir(RESOURCE_DIR)
     # Força o uso do X11 (xcb) no Linux porque o Wayland não permite embed de wid no mpv
     if sys.platform.startswith('linux'):
         os.environ["QT_QPA_PLATFORM"] = "xcb"
