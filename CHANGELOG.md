@@ -2,12 +2,31 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
-## [1.1.22] - 2026-08-28
+## [1.1.22] - 2026-08-30
 
 ### Adicionado
+* **Sistema de Internacionalização Dinâmica (i18n & l10n):** Criado o subsistema completo de tradução com `I18nManager` (`core/i18n.py`), permitindo alternar idiomas em tempo de execução sem reiniciar o aplicativo. Suporte nativo completo a 9 idiomas:
+  - 🇧🇷 Português do Brasil (`pt_BR`)
+  - 🇺🇸 Inglês (`en_US`)
+  - 🇪🇸 Espanhol (`es_ES`)
+  - 🇫🇷 Francês (`fr_FR`)
+  - 🇩🇪 Alemão (`de_DE`)
+  - 🇮🇹 Italiano (`it_IT`)
+  - 🇷🇺 Russo (`ru_RU`)
+  - 🇨🇳 Chinês Simplificado (`zh_CN`)
+  - 🇯🇵 Japonês (`ja_JP`)
+* **Tradução Nativa de Menus de Contexto do Qt (`QTranslator`):** Empacotamento dos catálogos de tradução compilados (`qtbase_*.qm` e `qt_*.qm`) em `assets/translations/qt/` com injeção dinâmica em tempo de execução, traduzindo automaticamente ações de clique direito nos campos de texto (*Desfazer*, *Refazer*, *Recortar*, *Copiar*, *Colar*, *Excluir*, *Selecionar tudo*) e diálogos do sistema.
+* **Testes de Internacionalização e Menus de Contexto:** Adicionada suíte de testes unitários dedicada (`tests/test_i18n.py`) com 10 testes cobrindo chaveamento de idioma, persistência em `QSettings`, carregamento de catálogos JSON, integridade e menus de contexto nativos do Qt.
 * **Testes de Validação e Resolução do yt-dlp:** Adicionados novos testes unitários em `tests/test_ytdlp_engine.py` cobrindo a validação preventiva de URLs inválidas (sem scheme http/https) e a resolução correta dos binários do `yt-dlp` em ambientes Linux e Windows.
 
+### Corrigido
+* **Carregamento de `mpv-2.dll` no Windows 10/11 (`🔒 FIX`):** Corrigido erro de inicialização `FileNotFoundError: Could not find module mpv-2.dll (or one of its dependencies)` ao compilar no Windows. O script `build_windows.ps1` agora baixa a `libmpv-2.dll` estática do `mpv.net` (Direct3D/GDI nativo do Windows, eliminando a dependência externa de `vulkan-1.dll`).
+* **Proteção contra Crash no Startup (`MPVPlayerWidget`):** O módulo `gui/mpv_widget.py` agora isola o `import mpv` em bloco `try...except`, permitindo que a aplicação abra normalmente mesmo em ambientes com dependências gráficas ausentes ou corrompidas.
+* **Injeção de DLLs no Windows:** O `main.py` agora registra os caminhos de binários e da aplicação via `PATH`, `os.add_dll_directory` (Python 3.8+) e `ctypes.windll.kernel32.SetDllDirectoryW`, além de limpar atributos `:Zone.Identifier` ("Mark of the Web").
+* **Inclusão de Traduções no PyInstaller Windows:** O `build_windows.ps1` agora empacota corretamente os catálogos JSON e `.qm` (`--add-data "assets\translations;assets\translations"`).
+
 ### Alterado
+* **Tokens Canônicos nos Motores:** `FFmpegEngine`, `YTDLPEngine` e presets migrados para tokens neutros canônicos (`normal`, `90_cw`, `none`, `both`, `top_left`, `bottom_right`, `best`, `1080`), mantendo 100% de compatibilidade retroativa com presets e strings legadas.
 * **Atualização do Motor yt-dlp (`2026.08.19`):** Atualizada a dependência do `yt-dlp` para a versão mais recente oficial, contornando bloqueios do YouTube (desafios JS/nsig e erros HTTP 403).
 * **Resolução Blindada do Binário (`🔒 FIX`):** O `YTDLPEngine` agora prioriza explicitamente o executável `yt-dlp` presente no ambiente virtual (`sys.executable` e `resource_dir/venv/bin/yt-dlp`), prevenindo que pacotes obsoletos do sistema operacional (como APT) sejam acionados acidentalmente.
 * **Docstring Reposicionada (`start_download`):** Corrigido posicionamento da docstring no método `start_download` em conformidade com a PEP 257.
