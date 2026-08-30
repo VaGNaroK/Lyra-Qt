@@ -39,19 +39,26 @@ Remove-Item "ffmpeg_temp" -Recurse -Force
 Write-Host "[*] Baixando executavel autonomo do yt-dlp..." -ForegroundColor Yellow
 Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "assets\bin\yt-dlp.exe"
 
-# 4.1 Baixar libmpv (Shinchiro) para o Windows
-Write-Host "[*] Baixando 7zr.exe e biblioteca libmpv..." -ForegroundColor Yellow
-Invoke-WebRequest -Uri "https://www.7-zip.org/a/7zr.exe" -OutFile "7zr.exe"
-$apiUrl = "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
-$releaseData = Invoke-RestMethod -Uri $apiUrl
-$mpvUrl = ($releaseData.assets | Where-Object { $_.name -match "^mpv-dev-x86_64-20.*\.7z$" })[0].browser_download_url
-Invoke-WebRequest -Uri $mpvUrl -OutFile "mpv_dev.7z"
-.\7zr.exe e "mpv_dev.7z" -o"assets\bin" "libmpv-2.dll" -r -y
-if (Test-Path "assets\bin\libmpv-2.dll") {
-    Rename-Item -Path "assets\bin\libmpv-2.dll" -NewName "mpv-2.dll"
+# 4.1 Baixar libmpv (100% compativel com Windows 10/11 sem exigir drivers de Vulkan)
+Write-Host "[*] Baixando biblioteca libmpv..." -ForegroundColor Yellow
+$mpvApiUrl = "https://api.github.com/repos/mpvnet-player/mpv.net/releases/latest"
+$mpvZipUrl = "https://github.com/mpvnet-player/mpv.net/releases/download/v7.1.2.0/mpv.net-v7.1.2.0-portable-x64.zip"
+try {
+    $mpvRelease = Invoke-RestMethod -Uri $mpvApiUrl
+    $mpvAsset = ($mpvRelease.assets | Where-Object { $_.name -match "portable-x64\.zip$" })[0]
+    if ($mpvAsset) { $mpvZipUrl = $mpvAsset.browser_download_url }
+} catch {
+    Write-Host "[!] Usando URL de fallback para libmpv..." -ForegroundColor Gray
 }
-Remove-Item "mpv_dev.7z"
-Remove-Item "7zr.exe"
+
+Invoke-WebRequest -Uri $mpvZipUrl -OutFile "mpv_portable.zip"
+Expand-Archive -Path "mpv_portable.zip" -DestinationPath "mpv_temp" -Force
+if (Test-Path "mpv_temp\libmpv-2.dll") {
+    Copy-Item "mpv_temp\libmpv-2.dll" -Destination "assets\bin\mpv-2.dll" -Force
+    Copy-Item "mpv_temp\libmpv-2.dll" -Destination "assets\bin\libmpv-2.dll" -Force
+}
+Remove-Item "mpv_portable.zip" -Force
+Remove-Item "mpv_temp" -Recurse -Force
 
 # 5. Empacotar com PyInstaller
 Write-Host "[*] Iniciando PyInstaller..." -ForegroundColor Cyan
@@ -59,10 +66,13 @@ Write-Host "[*] Iniciando PyInstaller..." -ForegroundColor Cyan
     --add-data "assets\sounds;assets\sounds" `
     --add-data "assets\icons;assets\icons" `
     --add-data "assets\models;assets\models" `
+    --add-data "assets\translations;assets\translations" `
     --add-data "assets\bin\ffmpeg.exe;assets\bin" `
     --add-data "assets\bin\ffprobe.exe;assets\bin" `
     --add-data "assets\bin\yt-dlp.exe;assets\bin" `
     --add-binary "assets\bin\mpv-2.dll;assets\bin" `
+    --add-binary "assets\bin\mpv-2.dll;." `
+    --add-binary "assets\bin\libmpv-2.dll;assets\bin" `
     main.py
 
 Write-Host "[*] Extraindo versao do main.py..." -ForegroundColor Cyan

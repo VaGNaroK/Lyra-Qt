@@ -17,35 +17,43 @@ from PySide6.QtMultimedia import QSoundEffect
 from gui.mpv_widget import MPVPlayerWidget
 
 # ==============================================================================
-# 🔒 Importação da nossa nova arquitetura modular
+# 🔒 Importação da nossa arquitetura modular e internacionalização
 # ==============================================================================
 try:
     from core.ffmpeg_engine import FFmpegEngine
     from core.preset_manager import PresetManager
     from core.ytdlp_engine import YTDLPEngine
     from core.utils import normalize_bitrate
+    from core.i18n import i18n, tr, SUPPORTED_LANGUAGES
 except ImportError:
     from ffmpeg_engine import FFmpegEngine
     from preset_manager import PresetManager
     from ytdlp_engine import YTDLPEngine
     from utils import normalize_bitrate
+    from i18n import i18n, tr, SUPPORTED_LANGUAGES
+
 
 class LyraMainWindow(QMainWindow):
     """
     Classe principal da Interface Gráfica (GUI) do Lyra Multimedia Converter.
     Gerencia todas as abas, layouts, interações do usuário e delega as tarefas pesadas
     aos motores assíncronos (FFmpegEngine e YTDLPEngine).
+    Totalmente internacionalizada com suporte a múltiplos idiomas em tempo de execução.
     """
     def __init__(self, version, resource_dir=None):
         super().__init__()
         self.settings = QSettings("Lyra", "Lyra-Qt")
-        self.setWindowTitle(f"Lyra Multimedia Converter v{version}")
+        self.version = version
+        self.resource_dir = resource_dir or os.path.dirname(os.path.abspath(__file__))
+        
+        # Inicializa o subsistema de internacionalização
+        i18n.reinit_resource_dir(self.resource_dir)
+
+        self.setWindowTitle(tr("app_title", version=self.version))
         self.resize(1050, 700)
         self.setMinimumSize(950, 550)
         self.setAcceptDrops(True)
 
-        self.version = version
-        self.resource_dir = resource_dir or os.path.dirname(os.path.abspath(__file__))
         icon_path = os.path.join(self.resource_dir, "assets", "icons", "lyra.svg")
         self.app_icon = (
             QIcon(icon_path) if os.path.exists(icon_path)
@@ -65,7 +73,6 @@ class LyraMainWindow(QMainWindow):
         self.engine.progress_updated.connect(self.update_progress_ui)
         self.engine.log_updated.connect(self.update_log_ui)
         self.engine.process_finished.connect(self.on_ffmpeg_finished)
-
 
         self.preset_manager = PresetManager()
         self.ytdlp_engine = YTDLPEngine(self.resource_dir)
@@ -89,6 +96,10 @@ class LyraMainWindow(QMainWindow):
         self.center_on_screen()
         self.load_presets()
         self.apply_checkbox_stylesheet()
+
+        # Conecta sinal de alteração de idioma para re-tradução dinâmica da interface
+        i18n.language_changed.connect(self.retranslate_ui)
+        self.retranslate_ui()
 
     def apply_checkbox_stylesheet(self):
         chk_checked = os.path.join(self.resource_dir, "assets", "icons", "checkbox_checked.svg").replace("\\", "/")
@@ -143,17 +154,17 @@ class LyraMainWindow(QMainWindow):
 
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(self.app_icon)
-        self.tray_icon.setToolTip("Lyra Multimedia Converter")
+        self.tray_icon.setToolTip(tr("app_name"))
 
-        show_action = QAction("🖥️ Mostrar Lyra", self)
-        quit_action = QAction("❌ Sair", self)
-        show_action.triggered.connect(self.showNormal)
-        quit_action.triggered.connect(self.force_quit)
+        self.tray_show_action = QAction(tr("tray_show"), self)
+        self.tray_quit_action = QAction(tr("tray_quit"), self)
+        self.tray_show_action.triggered.connect(self.showNormal)
+        self.tray_quit_action.triggered.connect(self.force_quit)
 
         tray_menu = QMenu()
-        tray_menu.addAction(show_action)
+        tray_menu.addAction(self.tray_show_action)
         tray_menu.addSeparator()
-        tray_menu.addAction(quit_action)
+        tray_menu.addAction(self.tray_quit_action)
 
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.show()
@@ -204,15 +215,15 @@ class LyraMainWindow(QMainWindow):
             self.hide()
             if self.is_converting or self.is_downloading:
                 self._show_tray_message(
-                    "Lyra em Execução",
-                    "O app continuará rodando em segundo plano.",
+                    tr("tray_running_title"),
+                    tr("tray_running_msg"),
                     QSystemTrayIcon.Information, 3000
                 )
         else:
             if self.is_converting or self.is_downloading:
                 resposta = QMessageBox.question(
-                    self, "Aviso",
-                    "Há uma tarefa em andamento. Deseja forçar o encerramento?",
+                    self, tr("dialog_warning"),
+                    tr("close_confirm_msg"),
                     QMessageBox.Yes | QMessageBox.No
                 )
                 if resposta == QMessageBox.Yes:
@@ -228,10 +239,9 @@ class LyraMainWindow(QMainWindow):
 
     def force_quit(self):
         if self.is_converting or self.is_downloading:
-            # Parente None para não forçar o 'show()' automático da janela oculta pelo Qt
             resposta = QMessageBox.question(
-                None, "Aviso",
-                "Há uma tarefa em andamento. Deseja forçar o encerramento?",
+                None, tr("dialog_warning"),
+                tr("close_confirm_msg"),
                 QMessageBox.Yes | QMessageBox.No
             )
             if resposta == QMessageBox.Yes:
@@ -257,36 +267,36 @@ class LyraMainWindow(QMainWindow):
     def setup_ui(self):
         """
         Ponto de entrada central para construção de toda a interface do aplicativo.
-        Configura os painéis (Main, Advanced, Download) e a barra lateral de navegação.
+        Configura os painéis (Main, Advanced, Download), barra lateral e seletor de idiomas.
         """
-        self.toolbar = QToolBar("Ferramentas Principais")
+        self.toolbar = QToolBar(tr("toolbar_title"))
         self.toolbar.setMovable(False)
         self.addToolBar(Qt.TopToolBarArea, self.toolbar)
         self.toolbar.setStyleSheet("QToolBar QToolButton { font-size: 14px; padding: 4px; font-weight: bold; }")
 
-        self.action_add_file = QAction("📄 Adicionar Arquivo", self)
+        self.action_add_file = QAction(tr("action_add_file"), self)
         self.action_add_file.setShortcut("Ctrl+O")
-        self.action_add_file.setToolTip("Adicionar arquivo(s) à fila de conversão (Ctrl+O)")
+        self.action_add_file.setToolTip(tr("action_add_file_tt"))
 
-        self.action_add_folder = QAction("📁 Adicionar Pasta", self)
+        self.action_add_folder = QAction(tr("action_add_folder"), self)
         self.action_add_folder.setShortcut("Ctrl+Shift+O")
-        self.action_add_folder.setToolTip("Adicionar pasta recursivamente (Ctrl+Shift+O)")
+        self.action_add_folder.setToolTip(tr("action_add_folder_tt"))
 
-        self.action_remove = QAction("🗑️ Remover", self)
+        self.action_remove = QAction(tr("action_remove"), self)
         self.action_remove.setShortcut("Delete")
-        self.action_remove.setToolTip("Remove os arquivos selecionados da lista de conversão (Delete).")
+        self.action_remove.setToolTip(tr("action_remove_tt"))
         
-        self.action_clear = QAction("🧹 Limpar Lista", self)
+        self.action_clear = QAction(tr("action_clear"), self)
         self.action_clear.setShortcut("Ctrl+L")
-        self.action_clear.setToolTip("Limpa todos os arquivos da lista atual (Ctrl+L).")
+        self.action_clear.setToolTip(tr("action_clear_tt"))
         
-        self.action_download = QAction("🌐 Baixar da Web", self)
+        self.action_download = QAction(tr("action_download"), self)
         self.action_download.setShortcut("Ctrl+D")
-        self.action_download.setToolTip("Abre a ferramenta para baixar vídeos e áudios direto de links da internet (Ctrl+D).")
+        self.action_download.setToolTip(tr("action_download_tt"))
         
-        self.action_advanced = QAction("⚙️ Opções Avançadas", self)
+        self.action_advanced = QAction(tr("action_advanced"), self)
         self.action_advanced.setShortcut("Ctrl+E")
-        self.action_advanced.setToolTip("Acessa configurações detalhadas como qualidade, filtros, cortes e metadados (Ctrl+E).")
+        self.action_advanced.setToolTip(tr("action_advanced_tt"))
 
         self.toolbar.addAction(self.action_add_file)
         self.toolbar.addAction(self.action_add_folder)
@@ -297,19 +307,19 @@ class LyraMainWindow(QMainWindow):
         self.toolbar.addAction(self.action_download)
         self.toolbar.addAction(self.action_advanced)
 
-        self.btn_convert = QPushButton("🚀 Converter")
+        self.btn_convert = QPushButton(tr("btn_convert"))
         self.btn_convert.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold; padding: 6px 15px; font-size: 13px;")
         self.btn_convert.clicked.connect(self.start_conversion_queue)
 
-        self.btn_stop = QPushButton("🛑 Parar")
+        self.btn_stop = QPushButton(tr("btn_stop"))
         self.btn_stop.setStyleSheet("background-color: #C62828; color: white; font-weight: bold; padding: 6px 15px; font-size: 13px;")
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self.stop_conversion_queue)
 
-        self.btn_convert.setShortcut("F5")      # F5 = Iniciar conversão
-        self.btn_stop.setShortcut("Escape")     # Esc = Parar conversão
+        self.btn_convert.setShortcut("F5")
+        self.btn_stop.setShortcut("Escape")
 
-        # Pequeno espaçamento visual antes dos botões de ação
+        # Espaçamento visual antes dos botões de ação
         spacer_small = QWidget()
         spacer_small.setFixedWidth(20)
         self.toolbar.addWidget(spacer_small)
@@ -317,10 +327,23 @@ class LyraMainWindow(QMainWindow):
         self.toolbar.addWidget(self.btn_convert)
         self.toolbar.addWidget(self.btn_stop)
 
-        # Espaçador dinâmico após os botões para empurrar todos para a esquerda
+        # Espaçador dinâmico
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
+
+        # Seletor de Idioma na Toolbar
+        self.combo_language = QComboBox()
+        self.combo_language.setMinimumWidth(160)
+        self.combo_language.setStyleSheet("font-size: 12px; font-weight: bold; padding: 3px 8px;")
+        for code, name in SUPPORTED_LANGUAGES.items():
+            self.combo_language.addItem(f"🌐 {name}", code)
+        cur_lang = i18n.get_current_language()
+        lang_idx = self.combo_language.findData(cur_lang)
+        if lang_idx != -1:
+            self.combo_language.setCurrentIndex(lang_idx)
+        self.combo_language.currentIndexChanged.connect(self._on_language_selector_changed)
+        self.toolbar.addWidget(self.combo_language)
 
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
@@ -336,6 +359,11 @@ class LyraMainWindow(QMainWindow):
         self.action_advanced.triggered.connect(lambda: self.switch_page(1 if self.stacked_widget.currentIndex() != 1 else 0))
         self.action_download.triggered.connect(lambda: self.switch_page(2 if self.stacked_widget.currentIndex() != 2 else 0))
 
+    def _on_language_selector_changed(self, index):
+        lang_code = self.combo_language.currentData()
+        if lang_code and lang_code != i18n.get_current_language():
+            i18n.set_language(lang_code, persist=True)
+
     def create_main_page(self):
         """
         Constrói a tela principal onde fica a Tabela de Arquivos e o painel de Destino.
@@ -345,14 +373,15 @@ class LyraMainWindow(QMainWindow):
         main_layout.setContentsMargins(8, 8, 8, 8)
 
         format_layout = QHBoxLayout()
+        self.lbl_format = QLabel(tr("lbl_format"))
         self.combo_format = QComboBox()
         self.combo_format.addItems(["MP4", "MKV", "WEBM", "AVI", "MP3", "OGG", "OPUS", "WAV", "JPG", "PNG", "GIF", "BMP", "WEBP", "SRT"])
         self.combo_format.setMinimumWidth(150)
-        format_layout.addWidget(QLabel("🎬 Formato:"))
+        format_layout.addWidget(self.lbl_format)
         format_layout.addWidget(self.combo_format)
         
-        self.btn_clone_specs = QPushButton("🧠 Clonar Info")
-        self.btn_clone_specs.setToolTip("Clonar propriedades do vídeo selecionado na lista para o perfil atual")
+        self.btn_clone_specs = QPushButton(tr("btn_clone_specs"))
+        self.btn_clone_specs.setToolTip(tr("btn_clone_specs_tt"))
         self.btn_clone_specs.clicked.connect(self.clone_video_specs)
         format_layout.addWidget(self.btn_clone_specs)
         
@@ -360,20 +389,21 @@ class LyraMainWindow(QMainWindow):
         self.combo_presets.setMinimumWidth(200)
         self.combo_presets.currentIndexChanged.connect(self.on_preset_selected)
 
-        self.btn_save_preset = QPushButton("💾 Salvar Preset")
-        self.btn_save_preset.setToolTip("Salva suas configurações de áudio/vídeo atuais como um novo perfil.")
+        self.btn_save_preset = QPushButton(tr("btn_save_preset"))
+        self.btn_save_preset.setToolTip(tr("btn_save_preset_tt"))
         self.btn_save_preset.clicked.connect(self.save_new_preset)
 
-        self.btn_delete_preset = QPushButton("🗑️ Remover")
-        self.btn_delete_preset.setToolTip("Deleta o perfil de conversão selecionado (exceto Padrões do Sistema).")
+        self.btn_delete_preset = QPushButton(tr("btn_delete_preset"))
+        self.btn_delete_preset.setToolTip(tr("btn_delete_preset_tt"))
         self.btn_delete_preset.clicked.connect(self.delete_selected_preset)
         self.btn_delete_preset.setEnabled(False)
 
-        self.btn_reset_all = QPushButton("🔄 Restaurar Padrões")
-        self.btn_reset_all.setToolTip("Desfaz qualquer modificação e retorna às configurações ideais de fábrica.")
+        self.btn_reset_all = QPushButton(tr("btn_reset_all"))
+        self.btn_reset_all.setToolTip(tr("btn_reset_all_tt"))
         self.btn_reset_all.clicked.connect(self._trigger_hard_reset)
 
-        format_layout.addWidget(QLabel("📂 Presets:"))
+        self.lbl_presets = QLabel(tr("lbl_presets"))
+        format_layout.addWidget(self.lbl_presets)
         format_layout.addWidget(self.combo_presets)
         format_layout.addWidget(self.btn_reset_all)
         format_layout.addWidget(self.btn_save_preset)
@@ -383,8 +413,8 @@ class LyraMainWindow(QMainWindow):
 
         self.table_files = QTableWidget(0, 8)
         self.table_files.setHorizontalHeaderLabels([
-            "⏭️ Pular", "📋 Arquivo", "⚖️ Tamanho", "⏱️ Duração",
-            "📊 Est. Tamanho", "⏳ Decorrido", "⏳ Restante", "📈 Progresso"
+            tr("th_skip"), tr("th_file"), tr("th_size"), tr("th_duration"),
+            tr("th_est_size"), tr("th_elapsed"), tr("th_remaining"), tr("th_progress")
         ])
         self.table_files.setStyleSheet("QHeaderView::section { font-size: 13px; font-weight: bold; }")
         self.table_files.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -400,7 +430,7 @@ class LyraMainWindow(QMainWindow):
 
         dest_layout = QHBoxLayout()
         self.combo_exist_action = QComboBox()
-        self.combo_exist_action.addItems(["Sobrescrever", "Escolher outro nome", "Pular conversão"])
+        self.combo_exist_action.addItems([tr("exist_overwrite"), tr("exist_rename"), tr("exist_skip")])
         default_dest = os.path.join(os.path.expanduser("~"), "Vídeos", "Lyra")
         saved_dest = self.settings.value("last_destination", default_dest)
         if not os.path.exists(saved_dest):
@@ -412,22 +442,27 @@ class LyraMainWindow(QMainWindow):
         self.lbl_dest_path = QLabel(saved_dest)
         self.lbl_dest_path.setFrameStyle(QFrame.Panel | QFrame.Sunken)
         self.lbl_dest_path.setMinimumWidth(300)
-        self.btn_browse_dest = QPushButton("🔍 Procurar...")
+        self.btn_browse_dest = QPushButton(tr("btn_browse_dest"))
         self.btn_browse_dest.clicked.connect(self.browse_destination)
-        self.btn_open_dest = QPushButton("📂 Abrir Pasta")
+        self.btn_open_dest = QPushButton(tr("btn_open_dest"))
         self.btn_open_dest.clicked.connect(self.open_destination_folder)
-        dest_layout.addWidget(QLabel("📂 Destino:"))
+        
+        self.lbl_dest_title = QLabel(tr("lbl_destination"))
+        dest_layout.addWidget(self.lbl_dest_title)
         dest_layout.addWidget(self.combo_exist_action)
         dest_layout.addWidget(self.lbl_dest_path)
         dest_layout.addWidget(self.btn_browse_dest)
         dest_layout.addWidget(self.btn_open_dest)
         dest_layout.addStretch()
         
-        lbl_post_action = QLabel("Ao concluir: ")
-        lbl_post_action.setStyleSheet("font-weight: bold;")
+        self.lbl_post_action = QLabel(tr("lbl_post_action"))
+        self.lbl_post_action.setStyleSheet("font-weight: bold;")
         self.combo_post_action = QComboBox()
-        self.combo_post_action.addItems(["Não fazer nada", "Fechar o Lyra", "Suspender PC", "Desligar PC"])
-        dest_layout.addWidget(lbl_post_action)
+        self.combo_post_action.addItems([
+            tr("post_do_nothing"), tr("post_close_lyra"),
+            tr("post_suspend_pc"), tr("post_shutdown_pc")
+        ])
+        dest_layout.addWidget(self.lbl_post_action)
         dest_layout.addWidget(self.combo_post_action)
         main_layout.addLayout(dest_layout)
         self.stacked_widget.addWidget(self.main_page)
@@ -472,7 +507,6 @@ class LyraMainWindow(QMainWindow):
         self.create_log_tab()
         
         # ✅ FIX: adiciona advanced_page ao stack UMA única vez, após todas as abas serem criadas
-        # (antes era chamado 12× dentro de add_advanced_tab, gerando índices extras no stacked_widget)
         self.stacked_widget.addWidget(self.advanced_page)
         
         self.advanced_menu.setCurrentRow(0)
@@ -494,26 +528,28 @@ class LyraMainWindow(QMainWindow):
         layout = QVBoxLayout(self.download_page)
         layout.setContentsMargins(16, 16, 16, 16)
 
-        lbl_title = QLabel("📥 Baixar Mídia da Web")
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #42A5F5;")
-        layout.addWidget(lbl_title)
+        self.lbl_dl_title = QLabel(tr("lbl_dl_title"))
+        self.lbl_dl_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #42A5F5;")
+        layout.addWidget(self.lbl_dl_title)
 
         url_layout = QHBoxLayout()
         self.entry_dl_url = QLineEdit()
-        self.entry_dl_url.setPlaceholderText("Cole o link do YouTube, Vimeo, Twitter, etc. aqui...")
-        url_layout.addWidget(QLabel("🔗 URL do Vídeo:"))
+        self.entry_dl_url.setPlaceholderText(tr("ph_dl_url"))
+        self.lbl_dl_url = QLabel(tr("lbl_dl_url"))
+        url_layout.addWidget(self.lbl_dl_url)
         url_layout.addWidget(self.entry_dl_url)
         layout.addLayout(url_layout)
 
-        group_config = QGroupBox("🛠️ Configurações do Download")
-        group_config.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
-        config_layout = QVBoxLayout(group_config)
+        self.group_dl_config = QGroupBox(tr("grp_dl_config"))
+        self.group_dl_config.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
+        config_layout = QVBoxLayout(self.group_dl_config)
 
         mode_layout = QHBoxLayout()
         self.combo_dl_mode = QComboBox()
-        self.combo_dl_mode.addItems(["Vídeo Completo", "Somente Áudio"])
+        self.combo_dl_mode.addItems([tr("dl_mode_video"), tr("dl_mode_audio")])
         self.combo_dl_mode.currentIndexChanged.connect(self.toggle_dl_options)
-        mode_layout.addWidget(QLabel("🎭 Modo de Extração:"))
+        self.lbl_dl_mode = QLabel(tr("lbl_dl_mode"))
+        mode_layout.addWidget(self.lbl_dl_mode)
         mode_layout.addWidget(self.combo_dl_mode)
         mode_layout.addStretch()
         config_layout.addLayout(mode_layout)
@@ -521,12 +557,14 @@ class LyraMainWindow(QMainWindow):
         self.frame_dl_video = QFrame()
         v_layout = QHBoxLayout(self.frame_dl_video)
         self.combo_dl_v_res = QComboBox()
-        self.combo_dl_v_res.addItems(["Melhor Disponível", "2160p (4K)", "1440p (QuadHD)", "1080p (FullHD)", "720p (HD)", "480p (SD)"])
+        self.combo_dl_v_res.addItems([tr("dl_res_best"), "2160p (4K)", "1440p (QuadHD)", "1080p (FullHD)", "720p (HD)", "480p (SD)"])
         self.combo_dl_v_fmt = QComboBox()
         self.combo_dl_v_fmt.addItems(["mp4", "mkv", "webm"])
-        v_layout.addWidget(QLabel("🖥️ Resolução Máxima:"))
+        self.lbl_dl_max_res = QLabel(tr("lbl_dl_max_res"))
+        self.lbl_dl_container_fmt = QLabel(tr("lbl_dl_container_fmt"))
+        v_layout.addWidget(self.lbl_dl_max_res)
         v_layout.addWidget(self.combo_dl_v_res)
-        v_layout.addWidget(QLabel("📦 Formato do Contêiner:"))
+        v_layout.addWidget(self.lbl_dl_container_fmt)
         v_layout.addWidget(self.combo_dl_v_fmt)
         v_layout.addStretch()
         config_layout.addWidget(self.frame_dl_video)
@@ -537,20 +575,22 @@ class LyraMainWindow(QMainWindow):
         self.combo_dl_a_fmt.addItems(["mp3", "m4a", "opus", "wav", "flac"])
         self.combo_dl_a_bitrate = QComboBox()
         self.combo_dl_a_bitrate.addItems(["320K", "256K", "192K", "128K"])
-        a_layout.addWidget(QLabel("🎵 Formato do Áudio:"))
+        self.lbl_dl_audio_fmt = QLabel(tr("lbl_dl_audio_fmt"))
+        self.lbl_dl_audio_quality = QLabel(tr("lbl_dl_audio_quality"))
+        a_layout.addWidget(self.lbl_dl_audio_fmt)
         a_layout.addWidget(self.combo_dl_a_fmt)
-        a_layout.addWidget(QLabel("💎 Qualidade (Bitrate):"))
+        a_layout.addWidget(self.lbl_dl_audio_quality)
         a_layout.addWidget(self.combo_dl_a_bitrate)
         a_layout.addStretch()
         config_layout.addWidget(self.frame_dl_audio)
         self.frame_dl_audio.setVisible(False)
-        layout.addWidget(group_config)
+        layout.addWidget(self.group_dl_config)
 
         btn_dl_layout = QHBoxLayout()
-        self.btn_start_dl = QPushButton("📥 Iniciar Download")
+        self.btn_start_dl = QPushButton(tr("btn_start_dl"))
         self.btn_start_dl.setStyleSheet("background-color: #0277BD; color: white; font-weight: bold; padding: 6px 20px;")
         self.btn_start_dl.clicked.connect(self.start_download)
-        self.btn_stop_dl = QPushButton("❌ Cancelar")
+        self.btn_stop_dl = QPushButton(tr("btn_stop_dl"))
         self.btn_stop_dl.setStyleSheet("background-color: #C62828; color: white; font-weight: bold; padding: 6px 20px;")
         self.btn_stop_dl.setEnabled(False)
         self.btn_stop_dl.clicked.connect(self.stop_download)
@@ -584,19 +624,19 @@ class LyraMainWindow(QMainWindow):
         self.combo_audio_channels.addItems(["default", "1 (Mono)", "2 (Stereo)", "6 (5.1)"])
         
         self.combo_audio_track = QComboBox()
-        self.combo_audio_track.addItem("Padrão (Faixa Principal)", -1)
+        self.combo_audio_track.addItem(tr("audio_track_default"), -1)
         self.combo_audio_track.currentIndexChanged.connect(self._on_audio_track_changed)
         
-        self.chk_all_tracks = QCheckBox("Incluir todas as faixas de áudio")
-        self.chk_all_tracks.setToolTip("Mantém todos os áudios originais (ex: vários idiomas). Se desmarcado, mantém apenas a primeira faixa principal.")
+        self.chk_all_tracks = QCheckBox(tr("chk_all_tracks"))
+        self.chk_all_tracks.setToolTip(tr("chk_all_tracks_tt"))
         self.chk_all_tracks.toggled.connect(lambda checked: self.combo_audio_track.setEnabled(not checked))
 
-        self.chk_audio_drc = QCheckBox("Normalização Profissional (EBU R128 / -16 LUFS)")
-        self.chk_audio_drc.setToolTip("Normaliza o volume para o padrão de TV e Streaming, levantando vozes baixas e reduzindo explosões estouradas.")
+        self.chk_audio_drc = QCheckBox(tr("chk_audio_drc"))
+        self.chk_audio_drc.setToolTip(tr("chk_audio_drc_tt"))
         self.chk_audio_drc.stateChanged.connect(self._sync_live_audio_filters)
         
-        self.chk_noise_reduction = QCheckBox("Reduzir Ruído de Fundo (Rede Neural RNNoise)")
-        self.chk_noise_reduction.setToolTip("Usa Inteligência Artificial para limpar o chiado do vento e ruídos constantes de fundo, isolando a voz humana.")
+        self.chk_noise_reduction = QCheckBox(tr("chk_noise_reduction"))
+        self.chk_noise_reduction.setToolTip(tr("chk_noise_reduction_tt"))
         self.chk_noise_reduction.stateChanged.connect(self._sync_live_audio_filters)
         
         self.slider_volume = QSlider(Qt.Horizontal)
@@ -610,41 +650,46 @@ class LyraMainWindow(QMainWindow):
         vol_layout.addWidget(self.slider_volume)
         vol_layout.addWidget(self.lbl_volume_val)
 
-        layout.addRow("🔊 Codec de Áudio:", self.combo_audio_codec)
-        layout.addRow("🎯 Selecionar Faixa:", self.combo_audio_track)
-        layout.addRow("💎 Taxa de Bits (Bitrate):", self.combo_audio_bitrate)
-        layout.addRow("📊 Frequência:", self.combo_audio_freq)
-        layout.addRow("🎛️ Canais:", self.combo_audio_channels)
+        self.lbl_row_acodec = QLabel(tr("lbl_audio_codec"))
+        self.lbl_row_atrack = QLabel(tr("lbl_audio_track"))
+        self.lbl_row_abitrate = QLabel(tr("lbl_audio_bitrate"))
+        self.lbl_row_afreq = QLabel(tr("lbl_audio_freq"))
+        self.lbl_row_achannels = QLabel(tr("lbl_audio_channels"))
+        self.lbl_row_avolume = QLabel(tr("lbl_audio_volume"))
+
+        layout.addRow(self.lbl_row_acodec, self.combo_audio_codec)
+        layout.addRow(self.lbl_row_atrack, self.combo_audio_track)
+        layout.addRow(self.lbl_row_abitrate, self.combo_audio_bitrate)
+        layout.addRow(self.lbl_row_afreq, self.combo_audio_freq)
+        layout.addRow(self.lbl_row_achannels, self.combo_audio_channels)
         layout.addRow("", self.chk_all_tracks)
         layout.addRow("", self.chk_audio_drc)
         layout.addRow("", self.chk_noise_reduction)
-        layout.addRow("🔊 Volume do Áudio:", vol_layout)
+        layout.addRow(self.lbl_row_avolume, vol_layout)
 
-        group_external_audio = QGroupBox("🎵 Áudios Externos")
-        group_external_audio.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
-        ext_audio_layout = QVBoxLayout(group_external_audio)
+        self.group_external_audio = QGroupBox(tr("grp_external_audio"))
+        self.group_external_audio.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
+        ext_audio_layout = QVBoxLayout(self.group_external_audio)
         self.list_external_audios = QListWidget()
         self.list_external_audios.setFixedHeight(60)
         
         btn_ext_audio_layout = QHBoxLayout()
-        btn_add_audio = QPushButton("➕ Adicionar")
-        btn_add_audio.clicked.connect(self.browse_audio)
-        btn_rem_audio = QPushButton("➖ Remover")
-        btn_rem_audio.clicked.connect(lambda: self.list_external_audios.takeItem(self.list_external_audios.currentRow()))
-        btn_clear_audio = QPushButton("🧹 Limpar")
-        btn_clear_audio.clicked.connect(self.list_external_audios.clear)
+        self.btn_add_audio = QPushButton(tr("btn_add"))
+        self.btn_add_audio.clicked.connect(self.browse_audio)
+        self.btn_rem_audio = QPushButton(tr("btn_remove"))
+        self.btn_rem_audio.clicked.connect(lambda: self.list_external_audios.takeItem(self.list_external_audios.currentRow()))
+        self.btn_clear_audio = QPushButton(tr("btn_clear"))
+        self.btn_clear_audio.clicked.connect(self.list_external_audios.clear)
         
-        btn_ext_audio_layout.addWidget(btn_add_audio)
-        btn_ext_audio_layout.addWidget(btn_rem_audio)
-        btn_ext_audio_layout.addWidget(btn_clear_audio)
+        btn_ext_audio_layout.addWidget(self.btn_add_audio)
+        btn_ext_audio_layout.addWidget(self.btn_rem_audio)
+        btn_ext_audio_layout.addWidget(self.btn_clear_audio)
         
         ext_audio_layout.addWidget(self.list_external_audios)
         ext_audio_layout.addLayout(btn_ext_audio_layout)
         
-        layout.addRow(group_external_audio)
-        
-        # 🔒 AQUI ESTAVA O PROBLEMA: A linha abaixo tinha desaparecido do seu código!
-        self.add_advanced_tab(tab, "🎵 Áudio")
+        layout.addRow(self.group_external_audio)
+        self.add_advanced_tab(tab, tr("tab_audio"))
 
     def create_sync_tab(self):
         tab = QWidget()
@@ -681,26 +726,27 @@ class LyraMainWindow(QMainWindow):
         self.slider_audio_sync.valueChanged.connect(update_from_slider)
         self.spin_audio_sync.valueChanged.connect(update_from_spin)
         
-        btn_play = QPushButton("▶️ Play/Pause")
+        self.btn_sync_play = QPushButton(tr("btn_play_pause"))
         try:
-            btn_play.clicked.connect(lambda: self.mpv_widget.pause(not self.mpv_widget.mpv.pause))
+            self.btn_sync_play.clicked.connect(lambda: self.mpv_widget.pause(not self.mpv_widget.mpv.pause))
         except Exception:
-            pass  # ✅ FIX: Especificar Exception para não engolir SystemExit/KeyboardInterrupt
+            pass
         
-        controls_layout.addWidget(QLabel("⏳ Atraso de Áudio:"))
+        self.lbl_sync_delay = QLabel(tr("lbl_audio_delay"))
+        controls_layout.addWidget(self.lbl_sync_delay)
         controls_layout.addWidget(self.slider_audio_sync)
         controls_layout.addWidget(self.spin_audio_sync)
-        controls_layout.addWidget(btn_play)
+        controls_layout.addWidget(self.btn_sync_play)
         
         layout.addLayout(controls_layout)
-        self.add_advanced_tab(tab, "⏱️ Sincronia")
+        self.add_advanced_tab(tab, tr("tab_sync"))
 
     def create_trim_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        self.chk_enable_trim = QCheckBox("✂️ Ativar Corte de Vídeo (Trimming)")
-        self.chk_enable_trim.setToolTip("Habilita a seleção de tempo de início e fim. O arquivo final terá apenas o trecho marcado, descartando o resto.")
+        self.chk_enable_trim = QCheckBox(tr("chk_enable_trim"))
+        self.chk_enable_trim.setToolTip(tr("chk_enable_trim_tt"))
         self.chk_enable_trim.setChecked(False)
         layout.addWidget(self.chk_enable_trim)
 
@@ -712,11 +758,11 @@ class LyraMainWindow(QMainWindow):
 
         self.time_start = QTimeEdit()
         self.time_start.setDisplayFormat("HH:mm:ss.zzz")
-        self.btn_mark_start = QPushButton("⏱️ Marcar Início")
+        self.btn_mark_start = QPushButton(tr("btn_mark_start"))
 
         self.time_end = QTimeEdit()
         self.time_end.setDisplayFormat("HH:mm:ss.zzz")
-        self.btn_mark_end = QPushButton("⏱️ Marcar Fim")
+        self.btn_mark_end = QPushButton(tr("btn_mark_end"))
 
         def set_time_from_mpv(time_edit):
             if hasattr(self.mpv_widget_trim, 'mpv') and self.mpv_widget_trim.mpv:
@@ -728,24 +774,27 @@ class LyraMainWindow(QMainWindow):
         self.btn_mark_start.clicked.connect(lambda: set_time_from_mpv(self.time_start))
         self.btn_mark_end.clicked.connect(lambda: set_time_from_mpv(self.time_end))
 
-        controls_layout.addWidget(QLabel("De:"))
+        self.lbl_trim_from = QLabel(tr("lbl_trim_from"))
+        self.lbl_trim_to = QLabel(tr("lbl_trim_to"))
+
+        controls_layout.addWidget(self.lbl_trim_from)
         controls_layout.addWidget(self.time_start)
         controls_layout.addWidget(self.btn_mark_start)
         controls_layout.addStretch()
-        controls_layout.addWidget(QLabel("Até:"))
+        controls_layout.addWidget(self.lbl_trim_to)
         controls_layout.addWidget(self.time_end)
         controls_layout.addWidget(self.btn_mark_end)
 
         layout.addLayout(controls_layout)
-        self.add_advanced_tab(tab, "✂️ Cortes")
+        self.add_advanced_tab(tab, tr("tab_trim"))
 
     def create_video_tab(self):
         tab = QWidget()
         main_layout = QVBoxLayout(tab)
         
         # 1. Configurações Básicas
-        grp_basic = QGroupBox("Configurações Básicas")
-        basic_layout = QFormLayout(grp_basic)
+        self.grp_basic = QGroupBox(tr("grp_basic_settings"))
+        basic_layout = QFormLayout(self.grp_basic)
         
         self.combo_video_codec = QComboBox()
         self.combo_video_codec.setModel(QStandardItemModel())
@@ -755,8 +804,8 @@ class LyraMainWindow(QMainWindow):
         self.combo_video_fps.addItems(["default", "23.976", "24", "25", "29.97", "30", "60"])
         
         fps_mode_layout = QHBoxLayout()
-        self.radio_vfr = QRadioButton("Taxa de quadros por pico (VFR)")
-        self.radio_cfr = QRadioButton("Taxa constante de quadros (CFR)")
+        self.radio_vfr = QRadioButton(tr("radio_vfr"))
+        self.radio_cfr = QRadioButton(tr("radio_cfr"))
         self.radio_vfr.setChecked(True)
         fps_mode_layout.addWidget(self.radio_vfr)
         fps_mode_layout.addWidget(self.radio_cfr)
@@ -768,19 +817,24 @@ class LyraMainWindow(QMainWindow):
         self.combo_video_ratio = QComboBox()
         self.combo_video_ratio.addItems(["default", "4:3", "16:9", "21:9"])
 
-        basic_layout.addRow("📹 Codec de Vídeo:", self.combo_video_codec)
-        basic_layout.addRow("🎞️ Quadros por FPS:", self.combo_video_fps)
+        self.lbl_vcodec = QLabel(tr("lbl_video_codec"))
+        self.lbl_vfps = QLabel(tr("lbl_video_fps"))
+        self.lbl_vsize = QLabel(tr("lbl_video_size"))
+        self.lbl_vratio = QLabel(tr("lbl_video_ratio"))
+
+        basic_layout.addRow(self.lbl_vcodec, self.combo_video_codec)
+        basic_layout.addRow(self.lbl_vfps, self.combo_video_fps)
         basic_layout.addRow("", fps_mode_layout)
-        basic_layout.addRow("🖥️ Resolução:", self.combo_video_size)
-        basic_layout.addRow("📐 Proporção (Aspect):", self.combo_video_ratio)
-        main_layout.addWidget(grp_basic)
+        basic_layout.addRow(self.lbl_vsize, self.combo_video_size)
+        basic_layout.addRow(self.lbl_vratio, self.combo_video_ratio)
+        main_layout.addWidget(self.grp_basic)
         
         # 2. Qualidade
-        grp_quality = QGroupBox("Qualidade")
-        quality_layout = QFormLayout(grp_quality)
+        self.grp_quality = QGroupBox(tr("grp_quality"))
+        quality_layout = QFormLayout(self.grp_quality)
         
-        self.chk_crf = QCheckBox("Qualidade Constante (RF):")
-        self.chk_crf.setToolTip("Deixa o programa ajustar dinamicamente a taxa de bits para atingir o nível de qualidade desejado.")
+        self.chk_crf = QCheckBox(tr("chk_crf"))
+        self.chk_crf.setToolTip(tr("chk_crf_tt"))
         self.chk_crf.setChecked(True)
         
         self.slider_crf = QSlider(Qt.Horizontal)
@@ -798,14 +852,15 @@ class LyraMainWindow(QMainWindow):
         self.combo_video_bitrate.addItems(["default", "800", "1200", "2500", "5000", "8000"])
         self.combo_video_bitrate.setEditable(True)
         
+        self.lbl_vbitrate = QLabel(tr("lbl_video_bitrate"))
         bitrate_layout = QHBoxLayout()
-        bitrate_layout.addWidget(QLabel("Taxa de Bits (kbps):"))
+        bitrate_layout.addWidget(self.lbl_vbitrate)
         bitrate_layout.addWidget(self.combo_video_bitrate)
         
-        self.chk_2pass = QCheckBox("Codificação com várias passagens")
-        self.chk_2pass.setToolTip("Faz uma análise prévia do vídeo inteiro. Útil para extrair a máxima qualidade dentro de um limite rígido de Bitrate (Tamanho).")
-        self.chk_turbo_first_pass = QCheckBox("Passe de análise turbo")
-        self.chk_turbo_first_pass.setToolTip("Acelera dramaticamente a primeira passagem (análise) cortando cálculos pesados desnecessários.")
+        self.chk_2pass = QCheckBox(tr("chk_2pass"))
+        self.chk_2pass.setToolTip(tr("chk_2pass_tt"))
+        self.chk_turbo_first_pass = QCheckBox(tr("chk_turbo_first_pass"))
+        self.chk_turbo_first_pass.setToolTip(tr("chk_turbo_first_pass_tt"))
         self.chk_turbo_first_pass.setEnabled(False)
         
         self.chk_2pass.toggled.connect(self.chk_turbo_first_pass.setEnabled)
@@ -817,11 +872,11 @@ class LyraMainWindow(QMainWindow):
         quality_layout.addRow("", crf_layout)
         quality_layout.addRow("", bitrate_layout)
         quality_layout.addRow("", bitrate_opts_layout)
-        main_layout.addWidget(grp_quality)
+        main_layout.addWidget(self.grp_quality)
         
-        # 3. Opções Avançadas de Encoder (Estilo Handbrake)
-        grp_enc = QGroupBox("Otimização do Codificador")
-        enc_layout = QFormLayout(grp_enc)
+        # 3. Opções Avançadas de Encoder
+        self.grp_enc = QGroupBox(tr("grp_encoder_opt"))
+        enc_layout = QFormLayout(self.grp_enc)
         
         self.combo_color_range = QComboBox()
         self.combo_color_range.addItems(["Auto", "Limited", "Full"])
@@ -839,26 +894,33 @@ class LyraMainWindow(QMainWindow):
         self.combo_level = QComboBox()
         self.combo_level.addItems(["auto", "3.0", "3.1", "4.0", "4.1", "4.2", "5.0", "5.1", "5.2"])
         
-        self.chk_fast_decode = QCheckBox("Codificação rápida (Fast Decode)")
-        self.chk_fast_decode.setToolTip("Desliga o CABAC e Deblocking. O arquivo final será maior, mas extremamente leve para dispositivos velhos reproduzirem.")
+        self.chk_fast_decode = QCheckBox(tr("chk_fast_decode"))
+        self.chk_fast_decode.setToolTip(tr("chk_fast_decode_tt"))
         
         self.entry_x264_opts = QLineEdit()
-        self.entry_x264_opts.setPlaceholderText("Ex: bframes=3:cabac=1")
+        self.entry_x264_opts.setPlaceholderText(tr("ph_x264_opts"))
         
-        enc_layout.addRow("Color Range:", self.combo_color_range)
-        enc_layout.addRow("Predefinido (Preset):", self.combo_preset)
-        enc_layout.addRow("Sintonia (Tune):", self.combo_tune)
-        enc_layout.addRow("Perfil (Profile):", self.combo_profile)
-        enc_layout.addRow("Nível (Level):", self.combo_level)
-        enc_layout.addRow("", self.chk_fast_decode)
-        enc_layout.addRow("Opções Adicionais:", self.entry_x264_opts)
-        
-        main_layout.addWidget(grp_enc)
+        self.lbl_color_range = QLabel(tr("lbl_color_range"))
+        self.lbl_preset = QLabel(tr("lbl_preset"))
+        self.lbl_tune = QLabel(tr("lbl_tune"))
+        self.lbl_profile = QLabel(tr("lbl_profile"))
+        self.lbl_level = QLabel(tr("lbl_level"))
+        self.lbl_extra_opts = QLabel(tr("lbl_extra_opts"))
 
-        self.chk_video_only = QCheckBox("Somente Vídeo (Remover Áudio)")
-        self.chk_video_only.setToolTip("Remove todas as faixas de áudio, resultando num arquivo de vídeo mudo.")
-        self.chk_bad_index = QCheckBox("Corrigir index de arquivo corrompido")
-        self.chk_bad_index.setToolTip("Recria o cabeçalho e os tempos (timestamps) do vídeo. Útil se o arquivo original está travando no player de mídia.")
+        enc_layout.addRow(self.lbl_color_range, self.combo_color_range)
+        enc_layout.addRow(self.lbl_preset, self.combo_preset)
+        enc_layout.addRow(self.lbl_tune, self.combo_tune)
+        enc_layout.addRow(self.lbl_profile, self.combo_profile)
+        enc_layout.addRow(self.lbl_level, self.combo_level)
+        enc_layout.addRow("", self.chk_fast_decode)
+        enc_layout.addRow(self.lbl_extra_opts, self.entry_x264_opts)
+        
+        main_layout.addWidget(self.grp_enc)
+
+        self.chk_video_only = QCheckBox(tr("chk_video_only"))
+        self.chk_video_only.setToolTip(tr("chk_video_only_tt"))
+        self.chk_bad_index = QCheckBox(tr("chk_bad_index"))
+        self.chk_bad_index.setToolTip(tr("chk_bad_index_tt"))
         main_layout.addWidget(self.chk_video_only)
         main_layout.addWidget(self.chk_bad_index)
         
@@ -876,7 +938,7 @@ class LyraMainWindow(QMainWindow):
         self.update_video_codec_ui()
         toggle_crf_mode(True)
 
-        self.add_advanced_tab(tab, "🎥 Vídeo")
+        self.add_advanced_tab(tab, tr("tab_video"))
 
     def update_video_codec_ui(self):
         codec = self.combo_video_codec.currentText()
@@ -931,13 +993,13 @@ class LyraMainWindow(QMainWindow):
         self.slider_img_quality = QSlider(Qt.Horizontal)
         self.slider_img_quality.setRange(1, 31)
         self.slider_img_quality.setValue(2)
-        self.lbl_img_quality_val = QLabel("2 (Qualidade Máxima)")
+        self.lbl_img_quality_val = QLabel(f"2 ({tr('img_quality_max')})")
 
         def update_img_label(v):
-            if v <= 5: text = f"{v} (Qualidade Máxima)"
-            elif v <= 15: text = f"{v} (Boa Qualidade)"
-            elif v <= 25: text = f"{v} (Qualidade Média)"
-            else: text = f"{v} (Baixa / Mais Leve)"
+            if v <= 5: text = f"{v} ({tr('img_quality_max')})"
+            elif v <= 15: text = f"{v} ({tr('img_quality_good')})"
+            elif v <= 25: text = f"{v} ({tr('img_quality_med')})"
+            else: text = f"{v} ({tr('img_quality_low')})"
             self.lbl_img_quality_val.setText(text)
 
         self.slider_img_quality.valueChanged.connect(update_img_label)
@@ -945,73 +1007,83 @@ class LyraMainWindow(QMainWindow):
         img_quality_layout.addWidget(self.slider_img_quality)
         img_quality_layout.addWidget(self.lbl_img_quality_val)
 
-        layout.addRow("🖼️ Resolução (Tamanho):", self.combo_img_size)
-        layout.addRow("🎯 Compressão (1-31):", img_quality_layout)
-        self.add_advanced_tab(tab, "🖼️ Imagem")
+        self.lbl_img_size = QLabel(tr("lbl_img_size"))
+        self.lbl_img_quality = QLabel(tr("lbl_img_quality"))
+
+        layout.addRow(self.lbl_img_size, self.combo_img_size)
+        layout.addRow(self.lbl_img_quality, img_quality_layout)
+        self.add_advanced_tab(tab, tr("tab_image"))
 
     def create_subtitle_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        group_file = QGroupBox("📁 Seleção de Legendas")
-        group_file.setMinimumWidth(450)
-        group_file.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        group_file.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
+        self.group_sub_file = QGroupBox(tr("grp_sub_selection"))
+        self.group_sub_file.setMinimumWidth(450)
+        self.group_sub_file.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.group_sub_file.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
 
-        file_layout = QVBoxLayout(group_file)
+        file_layout = QVBoxLayout(self.group_sub_file)
         self.list_external_subs = QListWidget()
         self.list_external_subs.setFixedHeight(60)
         
         btn_ext_sub_layout = QHBoxLayout()
-        btn_add_sub = QPushButton("➕ Adicionar")
-        btn_add_sub.clicked.connect(self.browse_subtitle)
-        btn_rem_sub = QPushButton("➖ Remover")
-        btn_rem_sub.clicked.connect(lambda: self.list_external_subs.takeItem(self.list_external_subs.currentRow()))
-        btn_clear_sub = QPushButton("🧹 Limpar")
-        btn_clear_sub.clicked.connect(self.list_external_subs.clear)
+        self.btn_add_sub = QPushButton(tr("btn_add"))
+        self.btn_add_sub.clicked.connect(self.browse_subtitle)
+        self.btn_rem_sub = QPushButton(tr("btn_remove"))
+        self.btn_rem_sub.clicked.connect(lambda: self.list_external_subs.takeItem(self.list_external_subs.currentRow()))
+        self.btn_clear_sub = QPushButton(tr("btn_clear"))
+        self.btn_clear_sub.clicked.connect(self.list_external_subs.clear)
         
-        btn_ext_sub_layout.addWidget(btn_add_sub)
-        btn_ext_sub_layout.addWidget(btn_rem_sub)
-        btn_ext_sub_layout.addWidget(btn_clear_sub)
+        btn_ext_sub_layout.addWidget(self.btn_add_sub)
+        btn_ext_sub_layout.addWidget(self.btn_rem_sub)
+        btn_ext_sub_layout.addWidget(self.btn_clear_sub)
         
         file_layout.addWidget(self.list_external_subs)
         file_layout.addLayout(btn_ext_sub_layout)
 
-        group_mode = QGroupBox("⚙️ Modo de Aplicação")
-        group_mode.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
-        mode_layout = QFormLayout(group_mode)
+        self.group_sub_mode = QGroupBox(tr("grp_sub_mode"))
+        self.group_sub_mode.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
+        mode_layout = QFormLayout(self.group_sub_mode)
         self.combo_sub_mode = QComboBox()
-        self.combo_sub_mode.addItems(["Embutir no arquivo (Softsub)", "Queimar no vídeo (Hardsub)"])
-        mode_layout.addRow("🎭 Tipo de Renderização:", self.combo_sub_mode)
+        self.combo_sub_mode.addItems([tr("sub_mode_softsub"), tr("sub_mode_hardsub")])
+        self.lbl_sub_render_type = QLabel(tr("lbl_sub_render_type"))
+        mode_layout.addRow(self.lbl_sub_render_type, self.combo_sub_mode)
 
-        layout.addWidget(group_file)
-        layout.addWidget(group_mode)
+        layout.addWidget(self.group_sub_file)
+        layout.addWidget(self.group_sub_mode)
 
-        group_extract = QGroupBox("📤 Extração de Legenda (MKV, MP4)")
-        group_extract.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
-        extract_layout = QFormLayout(group_extract)
+        self.group_sub_extract = QGroupBox(tr("grp_sub_extract"))
+        self.group_sub_extract.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
+        extract_layout = QFormLayout(self.group_sub_extract)
         self.combo_sub_extract_track = QComboBox()
-        self.combo_sub_extract_track.addItems(["Faixa 1 (Padrão)", "Faixa 2", "Faixa 3", "Faixa 4"])
-        extract_layout.addRow("🎯 Extrair Faixa:", self.combo_sub_extract_track)
-        extract_note = QLabel("<i>Nota: Para extrair, selecione 'SRT' como formato na aba principal.<br>Legendas de imagem (PGS) não são suportadas sem OCR.</i>")
-        extract_note.setStyleSheet("color: white;")
-        extract_layout.addRow(extract_note)
-        layout.addWidget(group_extract)
+        self.combo_sub_extract_track.addItems([
+            tr("sub_track_1_default"),
+            tr("sub_track_n", n=2),
+            tr("sub_track_n", n=3),
+            tr("sub_track_n", n=4)
+        ])
+        self.lbl_sub_extract_track = QLabel(tr("lbl_sub_extract_track"))
+        extract_layout.addRow(self.lbl_sub_extract_track, self.combo_sub_extract_track)
+        self.extract_note = QLabel(tr("sub_extract_note"))
+        self.extract_note.setStyleSheet("color: white;")
+        extract_layout.addRow(self.extract_note)
+        layout.addWidget(self.group_sub_extract)
 
-        group_remove = QGroupBox("🚫 Remoção de Faixas Nativas (Descarte)")
-        group_remove.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
-        remove_layout = QVBoxLayout(group_remove)
+        self.group_sub_remove = QGroupBox(tr("grp_sub_remove"))
+        self.group_sub_remove.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
+        remove_layout = QVBoxLayout(self.group_sub_remove)
         self.list_sub_remove_tracks = QListWidget()
         self.list_sub_remove_tracks.setFixedHeight(80)
         remove_layout.addWidget(self.list_sub_remove_tracks)
-        layout.addWidget(group_remove)
+        layout.addWidget(self.group_sub_remove)
 
         layout.addStretch()
-        self.add_advanced_tab(tab, "📝 Legendas")
+        self.add_advanced_tab(tab, tr("tab_subtitles"))
 
     def browse_subtitle(self):
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Selecionar Legendas", os.path.expanduser("~"),
+            self, tr("dialog_select_subs"), os.path.expanduser("~"),
             "Arquivos de Legenda (*.srt *.ass *.vtt);;Todos os Arquivos (*.*)"
         )
         if paths:
@@ -1020,7 +1092,7 @@ class LyraMainWindow(QMainWindow):
 
     def browse_audio(self):
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Selecionar Áudios", os.path.expanduser("~"),
+            self, tr("dialog_select_audios"), os.path.expanduser("~"),
             "Arquivos de Áudio (*.mp3 *.wav *.aac *.flac *.ogg *.m4a);;Todos os Arquivos (*.*)"
         )
         if paths:
@@ -1031,32 +1103,43 @@ class LyraMainWindow(QMainWindow):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        basic_group = QGroupBox("🥋 Filtros Básicos")
-        basic_group.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
-        basic_layout = QFormLayout(basic_group)
+        self.basic_filter_group = QGroupBox(tr("grp_basic_filters"))
+        self.basic_filter_group.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
+        basic_layout = QFormLayout(self.basic_filter_group)
         self.combo_rotate = QComboBox()
-        self.combo_rotate.addItems(["Normal", "90° Horário", "90° Anti-horário", "180°", "Espelhar Horizontal", "Espelhar Vertical"])
-        self.chk_deinterlace = QCheckBox("Aplicar Desentrelaçamento (Yadif)")
-        self.chk_deinterlace.setToolTip("Remove os 'riscos horizontais' (efeito pente) presentes em gravações analógicas antigas de TV ou DVDs interlaçados.")
-        basic_layout.addRow("🔄 Rotação:", self.combo_rotate)
+        self.combo_rotate.addItems([
+            tr("rotate_normal"), tr("rotate_90_cw"), tr("rotate_90_ccw"),
+            tr("rotate_180"), tr("rotate_hflip"), tr("rotate_vflip")
+        ])
+        self.chk_deinterlace = QCheckBox(tr("chk_deinterlace"))
+        self.chk_deinterlace.setToolTip(tr("chk_deinterlace_tt"))
+        self.lbl_rotate = QLabel(tr("lbl_rotation"))
+        basic_layout.addRow(self.lbl_rotate, self.combo_rotate)
         basic_layout.addRow("", self.chk_deinterlace)
-        layout.addWidget(basic_group)
+        layout.addWidget(self.basic_filter_group)
 
-        fade_group = QGroupBox("🌓 Efeitos de Desvanecimento (Fade)")
-        fade_group.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
-        fade_layout = QFormLayout(fade_group)
+        self.fade_group = QGroupBox(tr("grp_fade"))
+        self.fade_group.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
+        fade_layout = QFormLayout(self.fade_group)
         self.spin_fade_duration = QSpinBox()
         self.spin_fade_duration.setRange(0, 20)
         self.combo_fade_pos = QComboBox()
-        self.combo_fade_pos.addItems(["Nenhum", "No início", "No final", "Ambos"])
+        self.combo_fade_pos.addItems([
+            tr("fade_pos_none"), tr("fade_pos_start"), tr("fade_pos_end"), tr("fade_pos_both")
+        ])
         self.combo_fade_type = QComboBox()
-        self.combo_fade_type.addItems(["Vídeo e Áudio", "Somente Vídeo", "Somente Áudio"])
-        fade_layout.addRow("⏳ Duração:", self.spin_fade_duration)
-        fade_layout.addRow("📍 Posição:", self.combo_fade_pos)
-        fade_layout.addRow("🎭 Tipo:", self.combo_fade_type)
-        layout.addWidget(fade_group)
+        self.combo_fade_type.addItems([
+            tr("fade_type_both"), tr("fade_type_video"), tr("fade_type_audio")
+        ])
+        self.lbl_fade_dur = QLabel(tr("lbl_duration"))
+        self.lbl_fade_pos = QLabel(tr("lbl_position"))
+        self.lbl_fade_type = QLabel(tr("lbl_type"))
+        fade_layout.addRow(self.lbl_fade_dur, self.spin_fade_duration)
+        fade_layout.addRow(self.lbl_fade_pos, self.combo_fade_pos)
+        fade_layout.addRow(self.lbl_fade_type, self.combo_fade_type)
+        layout.addWidget(self.fade_group)
 
-        self.group_crop = QGroupBox("✂️ Cortar Imagem (Crop)")
+        self.group_crop = QGroupBox(tr("grp_crop"))
         self.group_crop.setCheckable(True)
         self.group_crop.setChecked(False)
         self.group_crop.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
@@ -1070,21 +1153,27 @@ class LyraMainWindow(QMainWindow):
         self.spin_crop_left.setRange(0, 10000)
         self.spin_crop_right = QSpinBox()
         self.spin_crop_right.setRange(0, 10000)
-        crop_layout.addWidget(QLabel("🔝 Topo:"))
+        
+        self.lbl_crop_top = QLabel(tr("lbl_crop_top"))
+        self.lbl_crop_bottom = QLabel(tr("lbl_crop_bottom"))
+        self.lbl_crop_left = QLabel(tr("lbl_crop_left"))
+        self.lbl_crop_right = QLabel(tr("lbl_crop_right"))
+
+        crop_layout.addWidget(self.lbl_crop_top)
         crop_layout.addWidget(self.spin_crop_top)
-        crop_layout.addWidget(QLabel("🔜 Base:"))
+        crop_layout.addWidget(self.lbl_crop_bottom)
         crop_layout.addWidget(self.spin_crop_bottom)
-        crop_layout.addWidget(QLabel("⬅️ Esq:"))
+        crop_layout.addWidget(self.lbl_crop_left)
         crop_layout.addWidget(self.spin_crop_left)
-        crop_layout.addWidget(QLabel("➡️ Dir:"))
+        crop_layout.addWidget(self.lbl_crop_right)
         crop_layout.addWidget(self.spin_crop_right)
-        self.btn_auto_crop = QPushButton("🔍 Detectar Bordas Automagicamente")
+        self.btn_auto_crop = QPushButton(tr("btn_auto_crop"))
         self.btn_auto_crop.clicked.connect(self.run_auto_crop)
         crop_main_layout.addLayout(crop_layout)
         crop_main_layout.addWidget(self.btn_auto_crop)
         layout.addWidget(self.group_crop)
 
-        self.group_pad = QGroupBox("🔲 Preencher Bordas (Pad)")
+        self.group_pad = QGroupBox(tr("grp_pad"))
         self.group_pad.setCheckable(True)
         self.group_pad.setChecked(False)
         self.group_pad.setStyleSheet("QGroupBox::title { padding-right: 40px; }") # 🔒 FIX
@@ -1097,36 +1186,44 @@ class LyraMainWindow(QMainWindow):
         self.spin_pad_left.setRange(0, 10000)
         self.spin_pad_right = QSpinBox()
         self.spin_pad_right.setRange(0, 10000)
-        pad_layout.addWidget(QLabel("🔝 Topo:"))
+        
+        self.lbl_pad_top = QLabel(tr("lbl_crop_top"))
+        self.lbl_pad_bottom = QLabel(tr("lbl_crop_bottom"))
+        self.lbl_pad_left = QLabel(tr("lbl_crop_left"))
+        self.lbl_pad_right = QLabel(tr("lbl_crop_right"))
+
+        pad_layout.addWidget(self.lbl_pad_top)
         pad_layout.addWidget(self.spin_pad_top)
-        pad_layout.addWidget(QLabel("🔜 Base:"))
+        pad_layout.addWidget(self.lbl_pad_bottom)
         pad_layout.addWidget(self.spin_pad_bottom)
-        pad_layout.addWidget(QLabel("⬅️ Esq:"))
+        pad_layout.addWidget(self.lbl_pad_left)
         pad_layout.addWidget(self.spin_pad_left)
-        pad_layout.addWidget(QLabel("➡️ Dir:"))
+        pad_layout.addWidget(self.lbl_pad_right)
         pad_layout.addWidget(self.spin_pad_right)
         layout.addWidget(self.group_pad)
 
-        self.group_watermark = QGroupBox("💧 Marca d'água")
+        self.group_watermark = QGroupBox(tr("grp_watermark"))
         self.group_watermark.setCheckable(True)
         self.group_watermark.setChecked(False)
         self.group_watermark.setStyleSheet("QGroupBox::title { padding-right: 40px; }")
         wm_layout = QFormLayout(self.group_watermark)
         
-        self.lbl_wm_image = QLabel("Nenhuma imagem selecionada")
+        self.lbl_wm_image = QLabel(tr("lbl_no_image_selected"))
         self.lbl_wm_image.setWordWrap(True)
         self.lbl_wm_image.setStyleSheet("background-color: black; border: 1px dashed gray; padding: 5px;")
         
         wm_btn_layout = QHBoxLayout()
-        self.btn_wm_select = QPushButton("Escolher imagem...")
+        self.btn_wm_select = QPushButton(tr("btn_choose_image"))
         self.btn_wm_select.clicked.connect(self.select_watermark_image)
-        self.btn_wm_clear = QPushButton("Limpar")
+        self.btn_wm_clear = QPushButton(tr("btn_clear_wm"))
         self.btn_wm_clear.clicked.connect(self.clear_watermark_image)
         wm_btn_layout.addWidget(self.btn_wm_select)
         wm_btn_layout.addWidget(self.btn_wm_clear)
         
         self.combo_wm_pos = QComboBox()
-        self.combo_wm_pos.addItems(["Inferior direito", "Inferior esquerdo", "Superior direito", "Superior esquerdo", "Centro"])
+        self.combo_wm_pos.addItems([
+            tr("wm_pos_br"), tr("wm_pos_bl"), tr("wm_pos_tr"), tr("wm_pos_tl"), tr("wm_pos_center")
+        ])
         
         self.spin_wm_size = QSpinBox()
         self.spin_wm_size.setRange(1, 200)
@@ -1140,11 +1237,15 @@ class LyraMainWindow(QMainWindow):
         
         self.watermark_path = ""
         
+        self.lbl_wm_pos = QLabel(tr("lbl_position"))
+        self.lbl_wm_size = QLabel(tr("lbl_size"))
+        self.lbl_wm_opacity = QLabel(tr("lbl_opacity"))
+
         wm_layout.addRow(self.lbl_wm_image)
         wm_layout.addRow(wm_btn_layout)
-        wm_layout.addRow("📍 Posição:", self.combo_wm_pos)
-        wm_layout.addRow("📏 Tamanho:", self.spin_wm_size)
-        wm_layout.addRow("👻 Opacidade:", self.spin_wm_opacity)
+        wm_layout.addRow(self.lbl_wm_pos, self.combo_wm_pos)
+        wm_layout.addRow(self.lbl_wm_size, self.spin_wm_size)
+        wm_layout.addRow(self.lbl_wm_opacity, self.spin_wm_opacity)
         
         self.group_watermark.toggled.connect(self.update_player_watermark)
         self.combo_wm_pos.currentIndexChanged.connect(self.update_player_watermark)
@@ -1152,28 +1253,31 @@ class LyraMainWindow(QMainWindow):
         self.spin_wm_opacity.valueChanged.connect(self.update_player_watermark)
         
         layout.addWidget(self.group_watermark)
-
         layout.addStretch()
-        self.add_advanced_tab(tab, "🎨 Filtros")
+        self.add_advanced_tab(tab, tr("tab_filters"))
 
     def select_watermark_image(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Escolher imagem de marca d'água", "", "Imagens (*.png *.jpg *.jpeg *.bmp)")
+        file_path, _ = QFileDialog.getOpenFileName(self, tr("dialog_choose_wm"), "", "Imagens (*.png *.jpg *.jpeg *.bmp)")
         if file_path:
             self.lbl_wm_image.setText(file_path)
             self.watermark_path = file_path
             self.update_player_watermark()
 
     def clear_watermark_image(self):
-        self.lbl_wm_image.setText("Nenhuma imagem selecionada")
+        self.lbl_wm_image.setText(tr("lbl_no_image_selected"))
         self.watermark_path = ""
         self.update_player_watermark()
 
     def update_player_watermark(self):
         if hasattr(self, 'mpv_widget'):
+            wm_pos_tokens = ["bottom_right", "bottom_left", "top_right", "top_left", "center"]
+            idx = self.combo_wm_pos.currentIndex() if hasattr(self, 'combo_wm_pos') else 0
+            pos_token = wm_pos_tokens[idx] if 0 <= idx < len(wm_pos_tokens) else "bottom_right"
+
             watermark_options = {
                 "enabled": getattr(self, 'group_watermark', None) and self.group_watermark.isChecked(),
                 "image_path": getattr(self, 'watermark_path', ""),
-                "position": self.combo_wm_pos.currentText(),
+                "position": pos_token,
                 "size": self.spin_wm_size.value(),
                 "opacity": self.spin_wm_opacity.value()
             }
@@ -1182,7 +1286,7 @@ class LyraMainWindow(QMainWindow):
     def run_auto_crop(self):
         selected = self.table_files.selectedItems()
         if not selected:
-            QMessageBox.warning(self, "Aviso", "Selecione um ficheiro de vídeo na lista principal primeiro!")
+            QMessageBox.warning(self, tr("dialog_warning"), tr("auto_crop_select_file"))
             return
             
         row = selected[0].row()
@@ -1191,36 +1295,36 @@ class LyraMainWindow(QMainWindow):
         if not os.path.exists(file_path):
             return
             
-        self.btn_auto_crop.setText("⏳ A analisar vídeo...")
+        self.btn_auto_crop.setText(tr("btn_auto_crop_analyzing"))
         self.btn_auto_crop.setEnabled(False)
         QApplication.processEvents() 
         
         crop_data = self.engine.detect_crop(file_path)
         
-        self.btn_auto_crop.setText("🔍 Detectar Bordas Automagicamente")
+        self.btn_auto_crop.setText(tr("btn_auto_crop"))
         self.btn_auto_crop.setEnabled(True)
         
         if crop_data:
             t, b, l, r = crop_data["t"], crop_data["b"], crop_data["l"], crop_data["r"]
             if t == 0 and b == 0 and l == 0 and r == 0:
-                QMessageBox.information(self, "Auto-Crop", "O vídeo não tem barras pretas! Já está perfeito.")
+                QMessageBox.information(self, tr("dialog_auto_crop_title"), tr("auto_crop_no_bars"))
             else:
                 self.spin_crop_top.setValue(t)
                 self.spin_crop_bottom.setValue(b)
                 self.spin_crop_left.setValue(l)
                 self.spin_crop_right.setValue(r)
                 self.group_crop.setChecked(True)
-                QMessageBox.information(self, "Auto-Crop", f"Barras removidas com sucesso!\n\nForam cortados:\nTopo: {t}px | Base: {b}px\nEsquerda: {l}px | Direita: {r}px")
+                QMessageBox.information(self, tr("dialog_auto_crop_title"), tr("auto_crop_success", t=t, b=b, l=l, r=r))
         else:
-            QMessageBox.warning(self, "Erro", "Não foi possível analisar as bordas deste ficheiro.")
+            QMessageBox.warning(self, tr("dialog_error"), tr("auto_crop_error"))
 
     def create_speed_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        lbl_info = QLabel("ℹ️ <b>Controle de Velocidade:</b> Acima de 1x acelera, abaixo de 1x desacelera.")
-        lbl_info.setStyleSheet("color: white; font-size: 11px;")
-        layout.addWidget(lbl_info)
+        self.lbl_speed_info = QLabel(tr("lbl_speed_info"))
+        self.lbl_speed_info.setStyleSheet("color: white; font-size: 11px;")
+        layout.addWidget(self.lbl_speed_info)
 
         # Preset buttons
         presets_layout = QHBoxLayout()
@@ -1238,11 +1342,12 @@ class LyraMainWindow(QMainWindow):
         self.spin_speed.setSingleStep(0.1)
         self.spin_speed.setValue(1.0)
         self.spin_speed.valueChanged.connect(self.update_speed_live)
-        fine_layout.addRow("Velocidade Exata:", self.spin_speed)
+        self.lbl_exact_speed = QLabel(tr("lbl_exact_speed"))
+        fine_layout.addRow(self.lbl_exact_speed, self.spin_speed)
 
         # Pitch Preservation
-        self.chk_pitch = QCheckBox("Preservar o tom do áudio")
-        self.chk_pitch.setToolTip("Faz cálculos pesados para evitar a distorção 'Voz de Esquilo' ao acelerar, ou voz excessivamente grave ao desacelerar.")
+        self.chk_pitch = QCheckBox(tr("chk_preserve_pitch"))
+        self.chk_pitch.setToolTip(tr("chk_preserve_pitch_tt"))
         self.chk_pitch.setChecked(True)
         self.chk_pitch.toggled.connect(self.update_speed_live)
         fine_layout.addRow("", self.chk_pitch)
@@ -1250,7 +1355,7 @@ class LyraMainWindow(QMainWindow):
         layout.addLayout(fine_layout)
         layout.addStretch()
 
-        self.add_advanced_tab(tab, "⏩ Velocidade")
+        self.add_advanced_tab(tab, tr("tab_speed"))
 
     def update_speed_live(self):
         speed = self.spin_speed.value()
@@ -1264,8 +1369,6 @@ class LyraMainWindow(QMainWindow):
                 except:
                     pass
 
-
-
     def create_more_tab(self):
         tab = QWidget()
         layout = QFormLayout(tab)
@@ -1274,12 +1377,12 @@ class LyraMainWindow(QMainWindow):
         self.slider_threads = QSlider(Qt.Horizontal)
         self.slider_threads.setRange(0, max_threads)
         self.slider_threads.setValue(0)
-        self.lbl_threads_val = QLabel("Auto (Potência Máxima)")
+        self.lbl_threads_val = QLabel(tr("threads_auto"))
 
         def update_threads_label(v):
-            if v == 0: self.lbl_threads_val.setText("Auto (Potência Máxima)")
-            elif v == 1: self.lbl_threads_val.setText("1 Núcleo (Background)")
-            else: self.lbl_threads_val.setText(f"{v} Núcleos dedicados")
+            if v == 0: self.lbl_threads_val.setText(tr("threads_auto"))
+            elif v == 1: self.lbl_threads_val.setText(tr("threads_1"))
+            else: self.lbl_threads_val.setText(tr("threads_n", n=v))
 
         self.slider_threads.valueChanged.connect(update_threads_label)
         threads_layout = QHBoxLayout()
@@ -1287,47 +1390,52 @@ class LyraMainWindow(QMainWindow):
         threads_layout.addWidget(self.lbl_threads_val)
 
         self.entry_extra_args = QLineEdit()
-        self.entry_extra_args.setPlaceholderText("Ex: -preset ultrafast -tune animation")
+        self.entry_extra_args.setPlaceholderText(tr("ph_extra_ffmpeg_args"))
         self.entry_ffmpeg_path = QLineEdit("ffmpeg")
 
-        layout.addRow("🧠 Threads do Processador:", threads_layout)
-        layout.addRow("➕ Argumentos Extras do FFMPEG:", self.entry_extra_args)
-        layout.addRow("⚙️ Executável do Conversor:", self.entry_ffmpeg_path)
-        self.add_advanced_tab(tab, "➕ Mais Opções")
+        self.lbl_threads_title = QLabel(tr("lbl_cpu_threads"))
+        self.lbl_extra_args_title = QLabel(tr("lbl_extra_ffmpeg_args"))
+        self.lbl_ffmpeg_path_title = QLabel(tr("lbl_converter_exec"))
+
+        layout.addRow(self.lbl_threads_title, threads_layout)
+        layout.addRow(self.lbl_extra_args_title, self.entry_extra_args)
+        layout.addRow(self.lbl_ffmpeg_path_title, self.entry_ffmpeg_path)
+
+        self.add_advanced_tab(tab, tr("tab_more"))
 
     def create_tags_tab(self):
         tab = QWidget()
         layout = QFormLayout(tab)
 
-        lbl_warning = QLabel("ℹ️ <b>Nota:</b> Renomear o Título do arquivo só tem efeito se você for converter <b>1 único arquivo</b>.<br>Os outros metadados (Artista, Álbum, etc) serão aplicados em conversões em lote normalmente.")
-        lbl_warning.setStyleSheet("color: white; font-size: 11px;")
-        lbl_warning.setWordWrap(True)
-        layout.addRow(lbl_warning)
+        self.lbl_tags_warning = QLabel(tr("lbl_tags_warning"))
+        self.lbl_tags_warning.setStyleSheet("color: white; font-size: 11px;")
+        self.lbl_tags_warning.setWordWrap(True)
+        layout.addRow(self.lbl_tags_warning)
         spacer = QLabel("")
         spacer.setFixedHeight(15)
         layout.addRow(spacer)
 
         self.entry_meta_title = QLineEdit()
-        self.entry_meta_title.setPlaceholderText("Ex: video_de_gatinho (Sem a extensão)")
-        self.entry_meta_title.setToolTip("Substitui o nome do arquivo original por este caso você converta apenas 1 arquivo.")
+        self.entry_meta_title.setPlaceholderText(tr("ph_meta_title"))
+        self.entry_meta_title.setToolTip(tr("tt_meta_title"))
         
         self.entry_meta_artist = QLineEdit()
-        self.entry_meta_artist.setPlaceholderText("Ex: Autor ou Artista")
+        self.entry_meta_artist.setPlaceholderText(tr("ph_meta_artist"))
         
         self.entry_meta_album = QLineEdit()
-        self.entry_meta_album.setPlaceholderText("Ex: Nome do Álbum")
+        self.entry_meta_album.setPlaceholderText(tr("ph_meta_album"))
         
         self.entry_meta_year = QLineEdit()
-        self.entry_meta_year.setPlaceholderText("Ex: 2026")
+        self.entry_meta_year.setPlaceholderText(tr("ph_meta_year"))
         
         self.entry_meta_genre = QLineEdit()
-        self.entry_meta_genre.setPlaceholderText("Ex: Rock, Tutorial, Game")
+        self.entry_meta_genre.setPlaceholderText(tr("ph_meta_genre"))
         
         self.entry_meta_comment = QLineEdit()
-        self.entry_meta_comment.setPlaceholderText("Ex: Convertido com o Lyra")
+        self.entry_meta_comment.setPlaceholderText(tr("ph_meta_comment"))
 
         self.meta_cover_path = ""
-        self.lbl_cover_preview = QLabel("(nenhum)")
+        self.lbl_cover_preview = QLabel(tr("lbl_cover_none"))
         self.lbl_cover_preview.setFixedSize(80, 80)
         self.lbl_cover_preview.setAlignment(Qt.AlignCenter)
         self.lbl_cover_preview.setStyleSheet("border: 1px solid #555;")
@@ -1335,32 +1443,40 @@ class LyraMainWindow(QMainWindow):
 
         self.entry_cover_path = QLineEdit()
         self.entry_cover_path.setReadOnly(True)
-        self.entry_cover_path.setPlaceholderText("Sem capa (apenas saída de áudio)")
+        self.entry_cover_path.setPlaceholderText(tr("ph_no_cover"))
 
-        btn_choose_cover = QPushButton("Escolher imagem...")
-        btn_choose_cover.clicked.connect(self.choose_cover_art)
-        btn_clear_cover = QPushButton("Limpar")
-        btn_clear_cover.clicked.connect(self.clear_cover_art)
+        self.btn_choose_cover = QPushButton(tr("btn_choose_image"))
+        self.btn_choose_cover.clicked.connect(self.choose_cover_art)
+        self.btn_clear_cover = QPushButton(tr("btn_clear_wm"))
+        self.btn_clear_cover.clicked.connect(self.clear_cover_art)
 
         cover_controls_layout = QHBoxLayout()
         cover_controls_layout.addWidget(self.entry_cover_path)
-        cover_controls_layout.addWidget(btn_choose_cover)
-        cover_controls_layout.addWidget(btn_clear_cover)
+        cover_controls_layout.addWidget(self.btn_choose_cover)
+        cover_controls_layout.addWidget(self.btn_clear_cover)
 
-        layout.addRow("📌 Título (Novo Nome):", self.entry_meta_title)
-        layout.addRow("👤 Autor/Artista:", self.entry_meta_artist)
-        layout.addRow("💿 Álbum:", self.entry_meta_album)
-        layout.addRow("📅 Ano (Data):", self.entry_meta_year)
-        layout.addRow("🎭 Gênero:", self.entry_meta_genre)
-        layout.addRow("💬 Comentário:", self.entry_meta_comment)
-        layout.addRow("🖼️ Capa (Áudio):", cover_controls_layout)
+        self.lbl_meta_title = QLabel(tr("lbl_meta_title"))
+        self.lbl_meta_artist = QLabel(tr("lbl_meta_artist"))
+        self.lbl_meta_album = QLabel(tr("lbl_meta_album"))
+        self.lbl_meta_year = QLabel(tr("lbl_meta_year"))
+        self.lbl_meta_genre = QLabel(tr("lbl_meta_genre"))
+        self.lbl_meta_comment = QLabel(tr("lbl_meta_comment"))
+        self.lbl_meta_cover = QLabel(tr("lbl_meta_cover"))
+
+        layout.addRow(self.lbl_meta_title, self.entry_meta_title)
+        layout.addRow(self.lbl_meta_artist, self.entry_meta_artist)
+        layout.addRow(self.lbl_meta_album, self.entry_meta_album)
+        layout.addRow(self.lbl_meta_year, self.entry_meta_year)
+        layout.addRow(self.lbl_meta_genre, self.entry_meta_genre)
+        layout.addRow(self.lbl_meta_comment, self.entry_meta_comment)
+        layout.addRow(self.lbl_meta_cover, cover_controls_layout)
         layout.addRow("", self.lbl_cover_preview)
 
-        self.add_advanced_tab(tab, "🏷️ Marcadores")
+        self.add_advanced_tab(tab, tr("tab_tags"))
 
     def choose_cover_art(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Selecionar Capa (Cover Art)", "", "Imagens (*.jpg *.jpeg *.png)"
+            self, tr("dialog_select_cover"), "", "Imagens (*.jpg *.jpeg *.png)"
         )
         if file_path:
             self.meta_cover_path = file_path
@@ -1369,13 +1485,13 @@ class LyraMainWindow(QMainWindow):
             if not pixmap.isNull():
                 self.lbl_cover_preview.setPixmap(pixmap)
             else:
-                self.lbl_cover_preview.setText("(erro)")
+                self.lbl_cover_preview.setText(tr("lbl_cover_error"))
 
     def clear_cover_art(self):
         self.meta_cover_path = ""
         self.entry_cover_path.clear()
         self.lbl_cover_preview.clear()
-        self.lbl_cover_preview.setText("(nenhum)")
+        self.lbl_cover_preview.setText(tr("lbl_cover_none"))
 
     def create_log_tab(self):
         tab = QWidget()
@@ -1384,7 +1500,7 @@ class LyraMainWindow(QMainWindow):
         self.text_log.setReadOnly(True)
         self.text_log.setStyleSheet("background-color: #1e1e1e; color: #00ff00; font-family: monospace; font-size: 11px;")
         layout.addWidget(self.text_log)
-        self.add_advanced_tab(tab, "📜 Log do FFMPEG")
+        self.add_advanced_tab(tab, tr("tab_log"))
 
     def create_info_tab(self):
         tab = QWidget()
@@ -1393,7 +1509,7 @@ class LyraMainWindow(QMainWindow):
         self.text_media_info.setReadOnly(True)
         self.text_media_info.setStyleSheet("background-color: #2b2b2b; color: #ffeb3b; font-family: monospace; font-size: 13px;")
         layout.addWidget(self.text_media_info)
-        self.add_advanced_tab(tab, "ℹ️ Info da Mídia")
+        self.add_advanced_tab(tab, tr("tab_info"))
 
     def _load_mpv_for_current_tab(self):
         """Carrega o player MPV correto apenas se a aba correspondente estiver ativa."""
@@ -1403,16 +1519,13 @@ class LyraMainWindow(QMainWindow):
         if not os.path.exists(file_path):
             return
 
-        tab_names = [self.advanced_menu.item(i).text() for i in range(self.advanced_menu.count())]
         current_idx = self.advanced_menu.currentRow()
 
-        sync_idx = next((i for i, t in enumerate(tab_names) if "Sincronia" in t or "⏱️" in t), -1)
-        trim_idx = next((i for i, t in enumerate(tab_names) if "Cortes" in t or "✂️" in t), -1)
-
-        if current_idx == sync_idx and hasattr(self, 'mpv_widget'):
+        # Índice 1 = Sincronia, Índice 2 = Cortes
+        if current_idx == 1 and hasattr(self, 'mpv_widget'):
             self.mpv_widget.play(file_path)
             self.update_player_watermark()
-        elif current_idx == trim_idx and hasattr(self, 'mpv_widget_trim'):
+        elif current_idx == 2 and hasattr(self, 'mpv_widget_trim'):
             self.mpv_widget_trim.play(file_path)
 
     def on_file_selected_for_info(self):
@@ -1424,18 +1537,16 @@ class LyraMainWindow(QMainWindow):
         row = selected_items[0].row()
         file_path = self.table_files.item(row, 1).toolTip()
         
-        # 🔒 AQUI ESTAVA O PROBLEMA: Código duplicado limpo para uma única execução fluida
         if os.path.exists(file_path):
-            # ✅ FIX: Armazenar o arquivo e carregar MPV apenas na aba visível (lazy-load)
             self._last_selected_file = file_path
             self._load_mpv_for_current_tab()
-            self.text_media_info.setPlainText("A analisar mídia...")
+            self.text_media_info.setPlainText(tr("analyzing_media"))
             info_text = self.engine.get_human_media_info(file_path)
             self.text_media_info.setPlainText(info_text)
             
             self.combo_audio_track.blockSignals(True)
             self.combo_audio_track.clear()
-            self.combo_audio_track.addItem("Padrão (Faixa Principal)", -1)
+            self.combo_audio_track.addItem(tr("audio_track_default"), -1)
             
             tracks = self.engine.get_audio_tracks(file_path)
             for track_idx, desc in tracks:
@@ -1477,8 +1588,8 @@ class LyraMainWindow(QMainWindow):
         self.action_add_folder.setEnabled(is_main)
         self.action_remove.setEnabled(is_main)
         self.action_clear.setEnabled(is_main)
-        self.action_advanced.setText("⚙️ Opções Avançadas" if is_main else ("↩️ Voltar para Lista" if index == 1 else "⚙️ Opções Avançadas"))
-        self.action_download.setText("🌐 Baixar da Web" if is_main else ("↩️ Voltar para Lista" if index == 2 else "🌐 Baixar da Web"))
+        self.action_advanced.setText(tr("action_advanced") if is_main else (tr("action_back_to_list") if index == 1 else tr("action_advanced")))
+        self.action_download.setText(tr("action_download") if is_main else (tr("action_back_to_list") if index == 2 else tr("action_download")))
 
     def toggle_dl_options(self):
         is_audio = self.combo_dl_mode.currentIndex() == 1
@@ -1491,17 +1602,17 @@ class LyraMainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def browse_destination(self):
-        path = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Destino", self.lbl_dest_path.text(), options=QFileDialog.ShowDirsOnly)
+        path = QFileDialog.getExistingDirectory(self, tr("dialog_select_dest"), self.lbl_dest_path.text(), options=QFileDialog.ShowDirsOnly)
         if path: 
             self.lbl_dest_path.setText(path)
             self.settings.setValue("last_destination", path)
 
     def add_files_dialog(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "Adicionar Arquivos", os.path.expanduser("~"))
+        paths, _ = QFileDialog.getOpenFileNames(self, tr("dialog_add_files"), os.path.expanduser("~"))
         for path in paths: self.add_file_to_table(path)
 
     def add_folder_dialog(self):
-        path = QFileDialog.getExistingDirectory(self, "Adicionar Pasta", os.path.expanduser("~"), options=QFileDialog.ShowDirsOnly)
+        path = QFileDialog.getExistingDirectory(self, tr("dialog_add_folder"), os.path.expanduser("~"), options=QFileDialog.ShowDirsOnly)
         if path:
             for root, _, files in os.walk(path):
                 for f in files: self.add_file_to_table(os.path.join(root, f))
@@ -1514,7 +1625,7 @@ class LyraMainWindow(QMainWindow):
         for r in range(self.table_files.rowCount()):
             existing_item = self.table_files.item(r, 1)
             if existing_item and os.path.normcase(existing_item.toolTip()) == normalized_path:
-                return  # Arquivo já está na lista, ignorar silenciosamente
+                return
 
         row = self.table_files.rowCount()
         self.table_files.insertRow(row)
@@ -1525,7 +1636,7 @@ class LyraMainWindow(QMainWindow):
         name = QTableWidgetItem(os.path.basename(file_path))
         name.setToolTip(file_path)
         dur_sec = self.engine.get_media_duration(file_path)
-        dur = QTableWidgetItem(self.engine.format_time(dur_sec) if dur_sec > 0 else "Imagem/ND")
+        dur = QTableWidgetItem(self.engine.format_time(dur_sec) if dur_sec > 0 else tr("status_img_na"))
         dur.setToolTip(str(dur_sec))
 
         self.table_files.setItem(row, 0, chk)
@@ -1535,6 +1646,7 @@ class LyraMainWindow(QMainWindow):
         self.table_files.setItem(row, 4, QTableWidgetItem("--"))
         self.table_files.setItem(row, 5, QTableWidgetItem("--:--:--"))
         self.table_files.setItem(row, 6, QTableWidgetItem("--:--:--"))
+        
         # ✅ FIX: QProgressBar visual na coluna de progresso
         _PROGRESS_STYLE = """
             QProgressBar {
@@ -1552,7 +1664,7 @@ class LyraMainWindow(QMainWindow):
         progress_bar.setRange(0, 100)
         progress_bar.setValue(0)
         progress_bar.setTextVisible(True)
-        progress_bar.setFormat("Pronto")
+        progress_bar.setFormat(tr("status_ready"))
         progress_bar.setStyleSheet(_PROGRESS_STYLE)
         self.table_files.setCellWidget(row, 7, progress_bar)
 
@@ -1565,6 +1677,23 @@ class LyraMainWindow(QMainWindow):
         if not self.is_converting: self.table_files.setRowCount(0)
 
     def get_ui_options(self):
+        fade_pos_tokens = ["none", "start", "end", "both"]
+        fade_type_tokens = ["both", "video", "audio"]
+        rotate_tokens = ["normal", "90_cw", "90_ccw", "180", "hflip", "vflip"]
+        wm_pos_tokens = ["bottom_right", "bottom_left", "top_right", "top_left", "center"]
+
+        rot_idx = self.combo_rotate.currentIndex() if hasattr(self, 'combo_rotate') else 0
+        rot_val = rotate_tokens[rot_idx] if 0 <= rot_idx < len(rotate_tokens) else "normal"
+
+        f_pos_idx = self.combo_fade_pos.currentIndex() if hasattr(self, 'combo_fade_pos') else 0
+        f_pos_val = fade_pos_tokens[f_pos_idx] if 0 <= f_pos_idx < len(fade_pos_tokens) else "none"
+
+        f_type_idx = self.combo_fade_type.currentIndex() if hasattr(self, 'combo_fade_type') else 0
+        f_type_val = fade_type_tokens[f_type_idx] if 0 <= f_type_idx < len(fade_type_tokens) else "both"
+
+        wm_pos_idx = self.combo_wm_pos.currentIndex() if hasattr(self, 'combo_wm_pos') else 0
+        wm_pos_val = wm_pos_tokens[wm_pos_idx] if 0 <= wm_pos_idx < len(wm_pos_tokens) else "bottom_right"
+
         return {
             "ffmpeg_path": self.entry_ffmpeg_path.text().strip() or "ffmpeg",
             "vcodec": self.combo_video_codec.currentText(),
@@ -1593,12 +1722,12 @@ class LyraMainWindow(QMainWindow):
             "trim_enabled": hasattr(self, 'chk_enable_trim') and self.chk_enable_trim.isChecked(),
             "trim_start": self.time_start.time().toString("HH:mm:ss.zzz") if hasattr(self, 'time_start') else "00:00:00.000",
             "trim_end": self.time_end.time().toString("HH:mm:ss.zzz") if hasattr(self, 'time_end') else "00:00:00.000",
-            "rotate": self.combo_rotate.currentText(),
+            "rotate": rot_val,
             "deinterlace": self.chk_deinterlace.isChecked(),
             "audio_offset_ms": getattr(self, 'slider_audio_sync', None).value() if hasattr(self, 'slider_audio_sync') else 0,
             "fade_dur": self.spin_fade_duration.value(),
-            "fade_pos": self.combo_fade_pos.currentText(),
-            "fade_type": self.combo_fade_type.currentText(),
+            "fade_pos": f_pos_val,
+            "fade_type": f_type_val,
             "crop": {
                 "enabled": self.group_crop.isChecked(),
                 "t": self.spin_crop_top.value(), "b": self.spin_crop_bottom.value(),
@@ -1612,7 +1741,7 @@ class LyraMainWindow(QMainWindow):
             "watermark": {
                 "enabled": getattr(self, 'group_watermark', None) and self.group_watermark.isChecked(),
                 "image_path": getattr(self, 'watermark_path', ""),
-                "position": getattr(self, 'combo_wm_pos', None).currentText() if hasattr(self, 'combo_wm_pos') else "Inferior direito",
+                "position": wm_pos_val,
                 "size": getattr(self, 'spin_wm_size', None).value() if hasattr(self, 'spin_wm_size') else 100,
                 "opacity": getattr(self, 'spin_wm_opacity', None).value() if hasattr(self, 'spin_wm_opacity') else 100
             },
@@ -1656,11 +1785,10 @@ class LyraMainWindow(QMainWindow):
         # Reseta o status de arquivos marcados que já foram concluídos ou deram erro
         for row in range(self.table_files.rowCount()):
             if self.table_files.item(row, 0).checkState() == Qt.Checked:
-                # ✅ FIX: Resetar QProgressBar ao reutilizar linha da fila
                 bar = self.table_files.cellWidget(row, 7)
                 if isinstance(bar, QProgressBar):
                     bar.setValue(0)
-                    bar.setFormat("Pronto")
+                    bar.setFormat(tr("status_ready"))
                     bar.setStyleSheet("""
                         QProgressBar { border:1px solid #555; border-radius:3px;
                             background-color:#2d2d2d; text-align:center; color:white; font-size:11px; }
@@ -1673,8 +1801,8 @@ class LyraMainWindow(QMainWindow):
                     self.table_files.item(row, 6).setText("--:--:--")
                 else:
                     current_status = self.table_files.item(row, 7)
-                    if current_status and current_status.text() in ("Concluído", "Erro"):
-                        current_status.setText("Pronto")
+                    if current_status:
+                        current_status.setText(tr("status_ready"))
                         self.table_files.item(row, 4).setText("--")
                         self.table_files.item(row, 5).setText("--:--:--")
                         self.table_files.item(row, 6).setText("--:--:--")
@@ -1698,7 +1826,7 @@ class LyraMainWindow(QMainWindow):
             if self.table_files.item(row, 0).checkState() == Qt.Checked:
                 bar = self.table_files.cellWidget(row, 7)
                 status = bar.format() if isinstance(bar, QProgressBar) else (self.table_files.item(row, 7).text() if self.table_files.item(row, 7) else "")
-                if status == "Pronto":
+                if status in (tr("status_ready"), "Pronto", "Ready", "Listo", "Prêt", "Bereit"):
                     row_to_process = row
                     break
 
@@ -1708,23 +1836,22 @@ class LyraMainWindow(QMainWindow):
             self.stop_conversion_queue()
             self.text_log.appendPlainText("\n--- FILA DE CONVERSÃO CONCLUÍDA ---\n")
             self._play_done_sound()
-            self._show_tray_message("Lyra", "Conversão Concluída!", QSystemTrayIcon.Information, 5000)
+            self._show_tray_message("Lyra", tr("tray_conv_done"), QSystemTrayIcon.Information, 5000)
             
-            post_action = self.combo_post_action.currentText()
-            if post_action == "Fechar o Lyra":
+            post_idx = self.combo_post_action.currentIndex()
+            if post_idx == 1:
                 QApplication.quit()
-            elif post_action == "Suspender PC":
+            elif post_idx == 2:
                 self.engine.suspend_pc()
-            elif post_action == "Desligar PC":
+            elif post_idx == 3:
                 self.engine.shutdown_pc()
             else:
-                if self.isActiveWindow(): QMessageBox.information(self, "Aviso", "Conversão da lista concluída!")
+                if self.isActiveWindow(): QMessageBox.information(self, tr("dialog_warning"), tr("conversion_completed_msg"))
             
             return
 
         ui_opts = getattr(self, 'current_batch_options', self.get_ui_options())
         input_file = self.table_files.item(row_to_process, 1).toolTip()
-        # ✅ FIX: Tratar toolTip vazio/inválido para imagens e arquivos sem duração detectada
         try:
             duration = float(self.table_files.item(row_to_process, 3).toolTip())
         except (ValueError, TypeError):
@@ -1740,24 +1867,21 @@ class LyraMainWindow(QMainWindow):
         output_file = os.path.join(self.lbl_dest_path.text(), f"{base_name}.{ext}")
 
         if os.path.exists(output_file):
-            action = self.combo_exist_action.currentText()
-            if action == "Pular conversão":
-                self.table_files.setItem(row_to_process, 7, QTableWidgetItem("Pulado"))
+            action_idx = self.combo_exist_action.currentIndex()
+            if action_idx == 2: # Skip
+                self.table_files.setItem(row_to_process, 7, QTableWidgetItem(tr("status_skipped")))
                 self.text_log.appendPlainText(f"\n[Aviso] O arquivo '{os.path.basename(output_file)}' já existe. Pulando conversão...\n")
-                # Usa um pequeno delay para não travar a UI caso muitos sejam pulados sequencialmente
                 from PySide6.QtCore import QTimer
                 QTimer.singleShot(100, self.process_next_file)
                 return
-            elif action == "Escolher outro nome":
-                base, ext = os.path.splitext(output_file)
+            elif action_idx == 1: # Rename
+                base, ext_out = os.path.splitext(output_file)
                 counter = 1
                 while os.path.exists(output_file):
-                    output_file = f"{base}_{counter}{ext}"
+                    output_file = f"{base}_{counter}{ext_out}"
                     counter += 1
-            # Se for "Sobrescrever", segue normalmente, pois o FFmpeg_engine já passa a flag '-y'.
 
-        self.table_files.setItem(row_to_process, 7, QTableWidgetItem("Processando..."))
-        
+        self.table_files.setItem(row_to_process, 7, QTableWidgetItem(tr("status_processing")))
         self.engine.start_conversion(row_to_process, input_file, output_file, duration, ui_opts)
 
     def update_progress_ui(self, row, progress, elapsed, rem, size, status):
@@ -1765,7 +1889,6 @@ class LyraMainWindow(QMainWindow):
         self.table_files.item(row, 6).setText(rem)
         if size:
             self.table_files.item(row, 4).setText(size)
-        # ✅ FIX: Atualizar QProgressBar visual
         bar = self.table_files.cellWidget(row, 7)
         if isinstance(bar, QProgressBar):
             bar.setValue(progress)
@@ -1781,7 +1904,7 @@ class LyraMainWindow(QMainWindow):
         if isinstance(bar, QProgressBar):
             if exitCode == 0:
                 bar.setValue(100)
-                bar.setFormat("✅ Concluído")
+                bar.setFormat(tr("status_completed"))
                 bar.setStyleSheet("""
                     QProgressBar { border:1px solid #2E7D32; border-radius:3px;
                         background-color:#1B5E20; text-align:center; color:white; font-size:11px; }
@@ -1789,14 +1912,14 @@ class LyraMainWindow(QMainWindow):
                 """)
             else:
                 bar.setValue(0)
-                bar.setFormat("❌ Erro")
+                bar.setFormat(tr("status_error"))
                 bar.setStyleSheet("""
                     QProgressBar { border:1px solid #B71C1C; border-radius:3px;
                         background-color:#4a1a1a; text-align:center; color:white; font-size:11px; }
                     QProgressBar::chunk { background-color:#EF5350; border-radius:2px; }
                 """)
         else:
-            status = "Concluído" if exitCode == 0 else "Erro"
+            status = tr("status_completed") if exitCode == 0 else tr("status_error")
             self.table_files.setItem(row, 7, QTableWidgetItem(status))
         self.process_next_file()
 
@@ -1804,15 +1927,28 @@ class LyraMainWindow(QMainWindow):
         data = self.preset_manager.load_presets()
         self.combo_presets.blockSignals(True)
         self.combo_presets.clear()
-        self.combo_presets.addItem("🟢 Padrão do Sistema (Automático)")
+        self.combo_presets.addItem(tr("preset_default_name"))
         for name in data: self.combo_presets.addItem(f"⭐ {name}")
         self.combo_presets.setCurrentIndex(0)
         self.combo_presets.blockSignals(False)
         self.btn_delete_preset.setEnabled(False)
 
     def _capture_preset_state(self):
+        fade_pos_tokens = ["none", "start", "end", "both"]
+        fade_type_tokens = ["both", "video", "audio"]
+        rotate_tokens = ["normal", "90_cw", "90_ccw", "180", "hflip", "vflip"]
+
+        rot_idx = self.combo_rotate.currentIndex() if hasattr(self, 'combo_rotate') else 0
+        rot_val = rotate_tokens[rot_idx] if 0 <= rot_idx < len(rotate_tokens) else "normal"
+
+        f_pos_idx = self.combo_fade_pos.currentIndex() if hasattr(self, 'combo_fade_pos') else 0
+        f_pos_val = fade_pos_tokens[f_pos_idx] if 0 <= f_pos_idx < len(fade_pos_tokens) else "none"
+
+        f_type_idx = self.combo_fade_type.currentIndex() if hasattr(self, 'combo_fade_type') else 0
+        f_type_val = fade_type_tokens[f_type_idx] if 0 <= f_type_idx < len(fade_type_tokens) else "both"
+
         return {
-            "preset_version": 1,
+            "preset_version": 2,
             "format": self.combo_format.currentText(),
             "vcodec": self.combo_video_codec.currentText(),
             "vbitrate": self.combo_video_bitrate.currentText(),
@@ -1827,11 +1963,11 @@ class LyraMainWindow(QMainWindow):
             "audio_drc": self.chk_audio_drc.isChecked(),
             "noise_reduction": self.chk_noise_reduction.isChecked(),
             "all_tracks": self.chk_all_tracks.isChecked(),
-            "rotate": self.combo_rotate.currentText(),
+            "rotate": rot_val,
             "deinterlace": self.chk_deinterlace.isChecked(),
             "fade_dur": self.spin_fade_duration.value(),
-            "fade_pos": self.combo_fade_pos.currentText(),
-            "fade_type": self.combo_fade_type.currentText(),
+            "fade_pos": f_pos_val,
+            "fade_type": f_type_val,
             "threads": self.slider_threads.value(),
             "sub_mode": self.combo_sub_mode.currentIndex(),
             "crop_enabled": self.group_crop.isChecked(),
@@ -1847,6 +1983,26 @@ class LyraMainWindow(QMainWindow):
         def set_combo(combo, val):
             if val and combo.findText(val) == -1: combo.addItem(val)
             combo.setCurrentText(val or "default")
+
+        rotate_map = {
+            "normal": 0, "Normal": 0,
+            "90_cw": 1, "90° Horário": 1, "90° Clockwise": 1, "90° Horario": 1,
+            "90_ccw": 2, "90° Anti-horário": 2, "90° Counter-Clockwise": 2, "90° Antihorario": 2, "90° Anti-horaire": 2,
+            "180": 3, "180°": 3,
+            "hflip": 4, "Espelhar Horizontal": 4, "Horizontal Flip": 4, "Voltear Horizontal": 4, "Miroir horizontal": 4,
+            "vflip": 5, "Espelhar Vertical": 5, "Vertical Flip": 5, "Voltear Vertical": 5, "Miroir vertical": 5
+        }
+        fade_pos_map = {
+            "none": 0, "Nenhum": 0, "None": 0, "Ninguno": 0, "Aucun": 0, "Keine": 0,
+            "start": 1, "No início": 1, "At start": 1, "Al inicio": 1, "Au début": 1, "Am Anfang": 1,
+            "end": 2, "No final": 2, "At end": 2, "Al final": 2, "À la fin": 2, "Am Ende": 2,
+            "both": 3, "Ambos": 3, "Both": 3, "Les deux": 3, "Beide": 3
+        }
+        fade_type_map = {
+            "both": 0, "Vídeo e Áudio": 0, "Video and Audio": 0, "Vídeo y Audio": 0, "Vidéo et Audio": 0, "Video und Audio": 0,
+            "video": 1, "Somente Vídeo": 1, "Video Only": 1, "Solo Vídeo": 1, "Vidéo seule": 1, "Nur Video": 1,
+            "audio": 2, "Somente Áudio": 2, "Audio Only": 2, "Solo Audio": 2, "Audio seul": 2, "Nur Audio": 2
+        }
 
         combos = [self.combo_format, self.combo_video_codec, self.combo_video_bitrate, self.combo_video_size, self.combo_video_fps, self.combo_audio_codec, self.combo_audio_bitrate, self.combo_audio_freq, self.combo_audio_channels, self.combo_rotate, self.combo_fade_pos, self.combo_fade_type]
         for c in combos: c.blockSignals(True)
@@ -1866,11 +2022,19 @@ class LyraMainWindow(QMainWindow):
             self.chk_all_tracks.setChecked(bool(state.get("all_tracks")))
             self.chk_audio_drc.setChecked(bool(state.get("audio_drc")))
             self.chk_noise_reduction.setChecked(bool(state.get("noise_reduction")))
-            set_combo(self.combo_rotate, state.get("rotate"))
+
+            rot_val = state.get("rotate", "normal")
+            self.combo_rotate.setCurrentIndex(rotate_map.get(rot_val, 0))
+
             self.chk_deinterlace.setChecked(bool(state.get("deinterlace")))
             self.spin_fade_duration.setValue(state.get("fade_dur", 0))
-            set_combo(self.combo_fade_pos, state.get("fade_pos"))
-            set_combo(self.combo_fade_type, state.get("fade_type"))
+
+            f_pos_val = state.get("fade_pos", "none")
+            self.combo_fade_pos.setCurrentIndex(fade_pos_map.get(f_pos_val, 0))
+
+            f_type_val = state.get("fade_type", "both")
+            self.combo_fade_type.setCurrentIndex(fade_type_map.get(f_type_val, 0))
+
             self.slider_threads.setValue(state.get("threads", 0))
             self.combo_sub_mode.setCurrentIndex(state.get("sub_mode", 0))
             self.group_crop.setChecked(bool(state.get("crop_enabled")))
@@ -1933,10 +2097,8 @@ class LyraMainWindow(QMainWindow):
             self.spin_wm_opacity.setValue(100)
             self.clear_watermark_image()
 
-
         self.entry_extra_args.setText("")
         
-        # Fugitivos da Aba Vídeo
         if hasattr(self, 'combo_video_ratio'):
             self.combo_video_ratio.blockSignals(True)
             self.combo_video_ratio.setCurrentIndex(0)
@@ -1950,7 +2112,6 @@ class LyraMainWindow(QMainWindow):
         if hasattr(self, 'chk_bad_index'):
             self.chk_bad_index.setChecked(False)
             
-        # Novos itens: Handbrake / Otimização do Codificador
         if hasattr(self, 'combo_color_range'):
             self.combo_color_range.setCurrentIndex(0)
             self.combo_preset.setCurrentText("medium")
@@ -1962,7 +2123,6 @@ class LyraMainWindow(QMainWindow):
             self.entry_x264_opts.setText("")
             self.radio_vfr.setChecked(True)
 
-        # Fugitivos da Aba Áudio
         if hasattr(self, 'combo_audio_track'):
             self.combo_audio_track.blockSignals(True)
             self.combo_audio_track.setCurrentIndex(0)
@@ -1970,7 +2130,6 @@ class LyraMainWindow(QMainWindow):
         if hasattr(self, 'list_external_audios'):
             self.list_external_audios.clear()
         
-        # Aba Imagem
         if hasattr(self, 'combo_img_size'):
             self.combo_img_size.blockSignals(True)
             self.combo_img_size.setCurrentIndex(0)
@@ -1978,7 +2137,6 @@ class LyraMainWindow(QMainWindow):
         if hasattr(self, 'slider_img_quality'):
             self.slider_img_quality.setValue(2)
 
-        # Aba Legendas
         if hasattr(self, 'list_external_subs'):
             self.list_external_subs.clear()
         if hasattr(self, 'combo_sub_extract_track'):
@@ -1986,13 +2144,11 @@ class LyraMainWindow(QMainWindow):
         if hasattr(self, 'list_sub_remove_tracks'):
             self.list_sub_remove_tracks.clear()
 
-        # Aba Sincronia
         if hasattr(self, 'slider_audio_sync'):
             self.slider_audio_sync.setValue(0)
         if hasattr(self, 'spin_audio_sync'):
             self.spin_audio_sync.setValue(0.0)
             
-        # Aba Marcadores (Tags)
         if hasattr(self, 'entry_meta_title'):
             self.entry_meta_title.setText("")
         if hasattr(self, 'entry_meta_artist'):
@@ -2006,12 +2162,9 @@ class LyraMainWindow(QMainWindow):
         if hasattr(self, 'entry_meta_comment'):
             self.entry_meta_comment.setText("")
             
-        # Aba Mais
         if hasattr(self, 'entry_ffmpeg_path'):
             self.entry_ffmpeg_path.setText("ffmpeg")
 
-        # Aba Corte (Trimming)
-        from PySide6.QtCore import QTime
         if hasattr(self, 'chk_enable_trim'):
             self.chk_enable_trim.setChecked(False)
         if hasattr(self, 'time_start'):
@@ -2029,26 +2182,25 @@ class LyraMainWindow(QMainWindow):
         self._reset_advanced_options()
 
     def save_new_preset(self):
-        name, ok = QInputDialog.getText(self, "Salvar Preset", "Nome do Preset:")
+        name, ok = QInputDialog.getText(self, tr("preset_name_prompt_title"), tr("preset_name_prompt_label"))
         if not ok or not name.strip(): return
         name = name.strip()
         if name in self.preset_manager.presets_data:
-            QMessageBox.warning(self, "Conflito", f"Já existe um preset chamado '{name}'.")
+            QMessageBox.warning(self, tr("dialog_conflict"), tr("preset_exists_conflict", name=name))
             return
         state = self._capture_preset_state()
         if self.preset_manager.save_preset(name, state):
             self.load_presets()
             idx = self.combo_presets.findText(f"⭐ {name}")
             if idx != -1: self.combo_presets.setCurrentIndex(idx)
-            QMessageBox.information(self, "Sucesso", f"Preset '{name}' salvo!")
+            QMessageBox.information(self, tr("dialog_success"), tr("preset_saved_success", name=name))
         else:
-            QMessageBox.critical(self, "Erro", "Falha ao salvar o preset no disco.")
+            QMessageBox.critical(self, tr("dialog_error"), tr("preset_save_error"))
 
     def clone_video_specs(self):
-        # Verifica se há um item selecionado na tabela
         selected_rows = [item.row() for item in self.table_files.selectedItems()]
         if not selected_rows:
-            QMessageBox.warning(self, "Nenhum arquivo selecionado", "Por favor, selecione um arquivo na lista para clonar as especificações.")
+            QMessageBox.warning(self, tr("clone_no_file_title"), tr("clone_no_file_selected"))
             return
             
         row = selected_rows[0]
@@ -2058,13 +2210,10 @@ class LyraMainWindow(QMainWindow):
         specs = self.engine.get_media_specs(file_path)
         
         if specs["vcodec"] == "default" and specs["vbitrate"] == "default":
-            QMessageBox.warning(self, "Falha na análise", "Não foi possível extrair as especificações deste arquivo.")
+            QMessageBox.warning(self, tr("clone_failed_title"), tr("clone_failed_msg"))
             return
 
-        # Prepara o estado do preset para injetar
         state = self._capture_preset_state()
-        
-        # Sobrescreve as specs do arquivo
         state["vcodec"] = specs["vcodec"]
         if specs["vbitrate"] != "default": state["vbitrate"] = specs["vbitrate"]
         if specs["vsize"] != "default": state["vsize"] = specs["vsize"]
@@ -2074,19 +2223,12 @@ class LyraMainWindow(QMainWindow):
         if specs["abitrate"] != "default": state["abitrate"] = specs["abitrate"]
         if specs["afreq"] != "default": state["afreq"] = specs["afreq"]
         if specs["achannels"] != "default": state["achannels"] = specs["achannels"]
-        
-        # Desabilita o CRF porque clonamos um bitrate exato
         state["crf_enabled"] = False
 
         preset_name = f"Clone: {os.path.basename(file_path)}"
-        
-        # Salva apenas em memória (não chama save_preset no disco)
         self.preset_manager.presets_data[preset_name] = state
-        
-        # Adiciona na interface
         preset_ui_name = f"⭐ {preset_name}"
         
-        # Remove se já existir um clone com esse nome na UI
         idx = self.combo_presets.findText(preset_ui_name)
         if idx != -1:
             self.combo_presets.removeItem(idx)
@@ -2094,17 +2236,17 @@ class LyraMainWindow(QMainWindow):
         self.combo_presets.addItem(preset_ui_name)
         self.combo_presets.setCurrentIndex(self.combo_presets.count() - 1)
         
-        QMessageBox.information(self, "Clone Bem Sucedido", f"Especificações de '{os.path.basename(file_path)}' aplicadas como preset temporário.\n\nAltere o formato e inicie a conversão!")
+        QMessageBox.information(self, tr("clone_success_title"), tr("clone_success_msg", filename=os.path.basename(file_path)))
 
     def delete_selected_preset(self):
         current = self.combo_presets.currentText()
         if not current.startswith("⭐ "): return
         name = current[2:]
-        if QMessageBox.question(self, "Confirmar", f"Remover preset '{name}'?") == QMessageBox.No: return
+        if QMessageBox.question(self, tr("dialog_confirm"), tr("preset_delete_confirm", name=name)) == QMessageBox.No: return
         if self.preset_manager.delete_preset(name):
             self.load_presets()
         else:
-            QMessageBox.critical(self, "Erro", "Falha ao remover o preset.")
+            QMessageBox.critical(self, tr("dialog_error"), tr("preset_delete_error"))
 
     def on_preset_selected(self, index):
         if index == 0:
@@ -2127,11 +2269,16 @@ class LyraMainWindow(QMainWindow):
         self.dl_log.clear()
         dest_path = self.lbl_dest_path.text()
         mode = self.combo_dl_mode.currentIndex()
+
+        v_res_tokens = ["best", "2160", "1440", "1080", "720", "480"]
+        res_idx = self.combo_dl_v_res.currentIndex()
+        v_res_val = v_res_tokens[res_idx] if 0 <= res_idx < len(v_res_tokens) else "best"
+
         options = {
             "a_fmt": self.combo_dl_a_fmt.currentText(),
             "a_bitrate": self.combo_dl_a_bitrate.currentText(),
             "v_fmt": self.combo_dl_v_fmt.currentText(),
-            "v_res": self.combo_dl_v_res.currentText()
+            "v_res": v_res_val
         }
         self.ytdlp_engine.start_download(url, dest_path, mode, options)
 
@@ -2145,15 +2292,317 @@ class LyraMainWindow(QMainWindow):
         self.is_downloading = False
         self.btn_start_dl.setEnabled(True)
         self.btn_stop_dl.setEnabled(False)
-        self.dl_log.appendPlainText("\n✅ Concluído!" if exitCode == 0 else f"\n❌ Falha (Código {exitCode}).")
+        self.dl_log.appendPlainText(f"\n{tr('status_completed')}" if exitCode == 0 else f"\n{tr('status_error')} ({exitCode}).")
         self._play_done_sound()
-        self._show_tray_message("Lyra", "Download Concluído!", QSystemTrayIcon.Information, 5000)
+        self._show_tray_message("Lyra", tr("tray_dl_done"), QSystemTrayIcon.Information, 5000)
         
     def on_dl_error(self, error):
         self.is_downloading = False
         self.btn_start_dl.setEnabled(True)
         self.btn_stop_dl.setEnabled(False)
         self.dl_log.appendPlainText(f"\n❌ Erro crítico: Falha ao iniciar o motor de download ({error}).")
+
+    def retranslate_ui(self):
+        """
+        Atualiza todas as strings da interface gráfica quando o idioma é alterado.
+        Permite tradução instantânea e dinâmica sem necessidade de reiniciar o aplicativo.
+        """
+        # Janela e Tray
+        self.setWindowTitle(tr("app_title", version=self.version))
+        if getattr(self, 'tray_icon', None):
+            self.tray_icon.setToolTip(tr("app_name"))
+        if hasattr(self, 'tray_show_action'):
+            self.tray_show_action.setText(tr("tray_show"))
+        if hasattr(self, 'tray_quit_action'):
+            self.tray_quit_action.setText(tr("tray_quit"))
+
+        # Sincroniza o combobox de idiomas
+        if hasattr(self, 'combo_language'):
+            self.combo_language.blockSignals(True)
+            lang_idx = self.combo_language.findData(i18n.get_current_language())
+            if lang_idx != -1:
+                self.combo_language.setCurrentIndex(lang_idx)
+            self.combo_language.blockSignals(False)
+
+        # Toolbar
+        if hasattr(self, 'toolbar'):
+            self.toolbar.setWindowTitle(tr("toolbar_title"))
+        if hasattr(self, 'action_add_file'):
+            self.action_add_file.setText(tr("action_add_file"))
+            self.action_add_file.setToolTip(tr("action_add_file_tt"))
+        if hasattr(self, 'action_add_folder'):
+            self.action_add_folder.setText(tr("action_add_folder"))
+            self.action_add_folder.setToolTip(tr("action_add_folder_tt"))
+        if hasattr(self, 'action_remove'):
+            self.action_remove.setText(tr("action_remove"))
+            self.action_remove.setToolTip(tr("action_remove_tt"))
+        if hasattr(self, 'action_clear'):
+            self.action_clear.setText(tr("action_clear"))
+            self.action_clear.setToolTip(tr("action_clear_tt"))
+        if hasattr(self, 'action_download'):
+            is_main = (self.stacked_widget.currentIndex() == 0) if hasattr(self, 'stacked_widget') else True
+            self.action_download.setText(tr("action_download") if is_main else (tr("action_back_to_list") if self.stacked_widget.currentIndex() == 2 else tr("action_download")))
+            self.action_download.setToolTip(tr("action_download_tt"))
+        if hasattr(self, 'action_advanced'):
+            is_main = (self.stacked_widget.currentIndex() == 0) if hasattr(self, 'stacked_widget') else True
+            self.action_advanced.setText(tr("action_advanced") if is_main else (tr("action_back_to_list") if self.stacked_widget.currentIndex() == 1 else tr("action_advanced")))
+            self.action_advanced.setToolTip(tr("action_advanced_tt"))
+        if hasattr(self, 'btn_convert'):
+            self.btn_convert.setText(tr("btn_convert"))
+        if hasattr(self, 'btn_stop'):
+            self.btn_stop.setText(tr("btn_stop"))
+
+        # Tela Principal
+        if hasattr(self, 'lbl_format'):
+            self.lbl_format.setText(tr("lbl_format"))
+        if hasattr(self, 'btn_clone_specs'):
+            self.btn_clone_specs.setText(tr("btn_clone_specs"))
+            self.btn_clone_specs.setToolTip(tr("btn_clone_specs_tt"))
+        if hasattr(self, 'lbl_presets'):
+            self.lbl_presets.setText(tr("lbl_presets"))
+        if hasattr(self, 'btn_reset_all'):
+            self.btn_reset_all.setText(tr("btn_reset_all"))
+            self.btn_reset_all.setToolTip(tr("btn_reset_all_tt"))
+        if hasattr(self, 'btn_save_preset'):
+            self.btn_save_preset.setText(tr("btn_save_preset"))
+            self.btn_save_preset.setToolTip(tr("btn_save_preset_tt"))
+        if hasattr(self, 'btn_delete_preset'):
+            self.btn_delete_preset.setText(tr("btn_delete_preset"))
+            self.btn_delete_preset.setToolTip(tr("btn_delete_preset_tt"))
+        if hasattr(self, 'combo_presets') and self.combo_presets.count() > 0:
+            self.combo_presets.setItemText(0, tr("preset_default_name"))
+
+        if hasattr(self, 'table_files'):
+            self.table_files.setHorizontalHeaderLabels([
+                tr("th_skip"), tr("th_file"), tr("th_size"), tr("th_duration"),
+                tr("th_est_size"), tr("th_elapsed"), tr("th_remaining"), tr("th_progress")
+            ])
+
+        if hasattr(self, 'lbl_dest_title'):
+            self.lbl_dest_title.setText(tr("lbl_destination"))
+        if hasattr(self, 'combo_exist_action') and self.combo_exist_action.count() >= 3:
+            self.combo_exist_action.setItemText(0, tr("exist_overwrite"))
+            self.combo_exist_action.setItemText(1, tr("exist_rename"))
+            self.combo_exist_action.setItemText(2, tr("exist_skip"))
+        if hasattr(self, 'btn_browse_dest'):
+            self.btn_browse_dest.setText(tr("btn_browse_dest"))
+        if hasattr(self, 'btn_open_dest'):
+            self.btn_open_dest.setText(tr("btn_open_dest"))
+        if hasattr(self, 'lbl_post_action'):
+            self.lbl_post_action.setText(tr("lbl_post_action"))
+        if hasattr(self, 'combo_post_action') and self.combo_post_action.count() >= 4:
+            self.combo_post_action.setItemText(0, tr("post_do_nothing"))
+            self.combo_post_action.setItemText(1, tr("post_close_lyra"))
+            self.combo_post_action.setItemText(2, tr("post_suspend_pc"))
+            self.combo_post_action.setItemText(3, tr("post_shutdown_pc"))
+
+        # Menu Lateral Avançado (12 Abas)
+        tab_keys = [
+            "tab_audio", "tab_sync", "tab_trim", "tab_video", "tab_image",
+            "tab_subtitles", "tab_filters", "tab_speed", "tab_more",
+            "tab_tags", "tab_info", "tab_log"
+        ]
+        if hasattr(self, 'advanced_menu'):
+            for i, key in enumerate(tab_keys):
+                if i < self.advanced_menu.count():
+                    self.advanced_menu.item(i).setText(tr(key))
+
+        # Aba Áudio
+        if hasattr(self, 'lbl_row_acodec'): self.lbl_row_acodec.setText(tr("lbl_audio_codec"))
+        if hasattr(self, 'lbl_row_atrack'): self.lbl_row_atrack.setText(tr("lbl_audio_track"))
+        if hasattr(self, 'lbl_row_abitrate'): self.lbl_row_abitrate.setText(tr("lbl_audio_bitrate"))
+        if hasattr(self, 'lbl_row_afreq'): self.lbl_row_afreq.setText(tr("lbl_audio_freq"))
+        if hasattr(self, 'lbl_row_achannels'): self.lbl_row_achannels.setText(tr("lbl_audio_channels"))
+        if hasattr(self, 'lbl_row_avolume'): self.lbl_row_avolume.setText(tr("lbl_audio_volume"))
+        if hasattr(self, 'chk_all_tracks'):
+            self.chk_all_tracks.setText(tr("chk_all_tracks"))
+            self.chk_all_tracks.setToolTip(tr("chk_all_tracks_tt"))
+        if hasattr(self, 'chk_audio_drc'):
+            self.chk_audio_drc.setText(tr("chk_audio_drc"))
+            self.chk_audio_drc.setToolTip(tr("chk_audio_drc_tt"))
+        if hasattr(self, 'chk_noise_reduction'):
+            self.chk_noise_reduction.setText(tr("chk_noise_reduction"))
+            self.chk_noise_reduction.setToolTip(tr("chk_noise_reduction_tt"))
+        if hasattr(self, 'group_external_audio'): self.group_external_audio.setTitle(tr("grp_external_audio"))
+        if hasattr(self, 'btn_add_audio'): self.btn_add_audio.setText(tr("btn_add"))
+        if hasattr(self, 'btn_rem_audio'): self.btn_rem_audio.setText(tr("btn_remove"))
+        if hasattr(self, 'btn_clear_audio'): self.btn_clear_audio.setText(tr("btn_clear"))
+
+        # Aba Sincronia
+        if hasattr(self, 'lbl_sync_delay'): self.lbl_sync_delay.setText(tr("lbl_audio_delay"))
+        if hasattr(self, 'btn_sync_play'): self.btn_sync_play.setText(tr("btn_play_pause"))
+
+        # Aba Cortes
+        if hasattr(self, 'chk_enable_trim'):
+            self.chk_enable_trim.setText(tr("chk_enable_trim"))
+            self.chk_enable_trim.setToolTip(tr("chk_enable_trim_tt"))
+        if hasattr(self, 'lbl_trim_from'): self.lbl_trim_from.setText(tr("lbl_trim_from"))
+        if hasattr(self, 'lbl_trim_to'): self.lbl_trim_to.setText(tr("lbl_trim_to"))
+        if hasattr(self, 'btn_mark_start'): self.btn_mark_start.setText(tr("btn_mark_start"))
+        if hasattr(self, 'btn_mark_end'): self.btn_mark_end.setText(tr("btn_mark_end"))
+
+        # Aba Vídeo
+        if hasattr(self, 'grp_basic'): self.grp_basic.setTitle(tr("grp_basic_settings"))
+        if hasattr(self, 'lbl_vcodec'): self.lbl_vcodec.setText(tr("lbl_video_codec"))
+        if hasattr(self, 'lbl_vfps'): self.lbl_vfps.setText(tr("lbl_video_fps"))
+        if hasattr(self, 'radio_vfr'): self.radio_vfr.setText(tr("radio_vfr"))
+        if hasattr(self, 'radio_cfr'): self.radio_cfr.setText(tr("radio_cfr"))
+        if hasattr(self, 'lbl_vsize'): self.lbl_vsize.setText(tr("lbl_video_size"))
+        if hasattr(self, 'lbl_vratio'): self.lbl_vratio.setText(tr("lbl_video_ratio"))
+        if hasattr(self, 'grp_quality'): self.grp_quality.setTitle(tr("grp_quality"))
+        if hasattr(self, 'chk_crf'):
+            self.chk_crf.setText(tr("chk_crf"))
+            self.chk_crf.setToolTip(tr("chk_crf_tt"))
+        if hasattr(self, 'lbl_vbitrate'): self.lbl_vbitrate.setText(tr("lbl_video_bitrate"))
+        if hasattr(self, 'chk_2pass'):
+            self.chk_2pass.setText(tr("chk_2pass"))
+            self.chk_2pass.setToolTip(tr("chk_2pass_tt"))
+        if hasattr(self, 'chk_turbo_first_pass'):
+            self.chk_turbo_first_pass.setText(tr("chk_turbo_first_pass"))
+            self.chk_turbo_first_pass.setToolTip(tr("chk_turbo_first_pass_tt"))
+        if hasattr(self, 'grp_enc'): self.grp_enc.setTitle(tr("grp_encoder_opt"))
+        if hasattr(self, 'lbl_color_range'): self.lbl_color_range.setText(tr("lbl_color_range"))
+        if hasattr(self, 'lbl_preset'): self.lbl_preset.setText(tr("lbl_preset"))
+        if hasattr(self, 'lbl_tune'): self.lbl_tune.setText(tr("lbl_tune"))
+        if hasattr(self, 'lbl_profile'): self.lbl_profile.setText(tr("lbl_profile"))
+        if hasattr(self, 'lbl_level'): self.lbl_level.setText(tr("lbl_level"))
+        if hasattr(self, 'chk_fast_decode'):
+            self.chk_fast_decode.setText(tr("chk_fast_decode"))
+            self.chk_fast_decode.setToolTip(tr("chk_fast_decode_tt"))
+        if hasattr(self, 'lbl_extra_opts'): self.lbl_extra_opts.setText(tr("lbl_extra_opts"))
+        if hasattr(self, 'entry_x264_opts'): self.entry_x264_opts.setPlaceholderText(tr("ph_x264_opts"))
+        if hasattr(self, 'chk_video_only'):
+            self.chk_video_only.setText(tr("chk_video_only"))
+            self.chk_video_only.setToolTip(tr("chk_video_only_tt"))
+        if hasattr(self, 'chk_bad_index'):
+            self.chk_bad_index.setText(tr("chk_bad_index"))
+            self.chk_bad_index.setToolTip(tr("chk_bad_index_tt"))
+
+        # Aba Imagem
+        if hasattr(self, 'lbl_img_size'): self.lbl_img_size.setText(tr("lbl_img_size"))
+        if hasattr(self, 'lbl_img_quality'): self.lbl_img_quality.setText(tr("lbl_img_quality"))
+
+        # Aba Legendas
+        if hasattr(self, 'group_sub_file'): self.group_sub_file.setTitle(tr("grp_sub_selection"))
+        if hasattr(self, 'btn_add_sub'): self.btn_add_sub.setText(tr("btn_add"))
+        if hasattr(self, 'btn_rem_sub'): self.btn_rem_sub.setText(tr("btn_remove"))
+        if hasattr(self, 'btn_clear_sub'): self.btn_clear_sub.setText(tr("btn_clear"))
+        if hasattr(self, 'group_sub_mode'): self.group_sub_mode.setTitle(tr("grp_sub_mode"))
+        if hasattr(self, 'lbl_sub_render_type'): self.lbl_sub_render_type.setText(tr("lbl_sub_render_type"))
+        if hasattr(self, 'combo_sub_mode') and self.combo_sub_mode.count() >= 2:
+            self.combo_sub_mode.setItemText(0, tr("sub_mode_softsub"))
+            self.combo_sub_mode.setItemText(1, tr("sub_mode_hardsub"))
+        if hasattr(self, 'group_sub_extract'): self.group_sub_extract.setTitle(tr("grp_sub_extract"))
+        if hasattr(self, 'lbl_sub_extract_track'): self.lbl_sub_extract_track.setText(tr("lbl_sub_extract_track"))
+        if hasattr(self, 'combo_sub_extract_track') and self.combo_sub_extract_track.count() >= 4:
+            self.combo_sub_extract_track.setItemText(0, tr("sub_track_1_default"))
+            self.combo_sub_extract_track.setItemText(1, tr("sub_track_n", n=2))
+            self.combo_sub_extract_track.setItemText(2, tr("sub_track_n", n=3))
+            self.combo_sub_extract_track.setItemText(3, tr("sub_track_n", n=4))
+        if hasattr(self, 'extract_note'): self.extract_note.setText(tr("sub_extract_note"))
+        if hasattr(self, 'group_sub_remove'): self.group_sub_remove.setTitle(tr("grp_sub_remove"))
+
+        # Aba Filtros
+        if hasattr(self, 'basic_filter_group'): self.basic_filter_group.setTitle(tr("grp_basic_filters"))
+        if hasattr(self, 'lbl_rotate'): self.lbl_rotate.setText(tr("lbl_rotation"))
+        if hasattr(self, 'combo_rotate') and self.combo_rotate.count() >= 6:
+            self.combo_rotate.setItemText(0, tr("rotate_normal"))
+            self.combo_rotate.setItemText(1, tr("rotate_90_cw"))
+            self.combo_rotate.setItemText(2, tr("rotate_90_ccw"))
+            self.combo_rotate.setItemText(3, tr("rotate_180"))
+            self.combo_rotate.setItemText(4, tr("rotate_hflip"))
+            self.combo_rotate.setItemText(5, tr("rotate_vflip"))
+        if hasattr(self, 'chk_deinterlace'):
+            self.chk_deinterlace.setText(tr("chk_deinterlace"))
+            self.chk_deinterlace.setToolTip(tr("chk_deinterlace_tt"))
+        if hasattr(self, 'fade_group'): self.fade_group.setTitle(tr("grp_fade"))
+        if hasattr(self, 'lbl_fade_dur'): self.lbl_fade_dur.setText(tr("lbl_duration"))
+        if hasattr(self, 'lbl_fade_pos'): self.lbl_fade_pos.setText(tr("lbl_position"))
+        if hasattr(self, 'combo_fade_pos') and self.combo_fade_pos.count() >= 4:
+            self.combo_fade_pos.setItemText(0, tr("fade_pos_none"))
+            self.combo_fade_pos.setItemText(1, tr("fade_pos_start"))
+            self.combo_fade_pos.setItemText(2, tr("fade_pos_end"))
+            self.combo_fade_pos.setItemText(3, tr("fade_pos_both"))
+        if hasattr(self, 'lbl_fade_type'): self.lbl_fade_type.setText(tr("lbl_type"))
+        if hasattr(self, 'combo_fade_type') and self.combo_fade_type.count() >= 3:
+            self.combo_fade_type.setItemText(0, tr("fade_type_both"))
+            self.combo_fade_type.setItemText(1, tr("fade_type_video"))
+            self.combo_fade_type.setItemText(2, tr("fade_type_audio"))
+        if hasattr(self, 'group_crop'): self.group_crop.setTitle(tr("grp_crop"))
+        if hasattr(self, 'lbl_crop_top'): self.lbl_crop_top.setText(tr("lbl_crop_top"))
+        if hasattr(self, 'lbl_crop_bottom'): self.lbl_crop_bottom.setText(tr("lbl_crop_bottom"))
+        if hasattr(self, 'lbl_crop_left'): self.lbl_crop_left.setText(tr("lbl_crop_left"))
+        if hasattr(self, 'lbl_crop_right'): self.lbl_crop_right.setText(tr("lbl_crop_right"))
+        if hasattr(self, 'btn_auto_crop'): self.btn_auto_crop.setText(tr("btn_auto_crop"))
+        if hasattr(self, 'group_pad'): self.group_pad.setTitle(tr("grp_pad"))
+        if hasattr(self, 'lbl_pad_top'): self.lbl_pad_top.setText(tr("lbl_crop_top"))
+        if hasattr(self, 'lbl_pad_bottom'): self.lbl_pad_bottom.setText(tr("lbl_crop_bottom"))
+        if hasattr(self, 'lbl_pad_left'): self.lbl_pad_left.setText(tr("lbl_crop_left"))
+        if hasattr(self, 'lbl_pad_right'): self.lbl_pad_right.setText(tr("lbl_crop_right"))
+        if hasattr(self, 'group_watermark'): self.group_watermark.setTitle(tr("grp_watermark"))
+        if hasattr(self, 'btn_wm_select'): self.btn_wm_select.setText(tr("btn_choose_image"))
+        if hasattr(self, 'btn_wm_clear'): self.btn_wm_clear.setText(tr("btn_clear_wm"))
+        if hasattr(self, 'lbl_wm_pos'): self.lbl_wm_pos.setText(tr("lbl_position"))
+        if hasattr(self, 'lbl_wm_size'): self.lbl_wm_size.setText(tr("lbl_size"))
+        if hasattr(self, 'lbl_wm_opacity'): self.lbl_wm_opacity.setText(tr("lbl_opacity"))
+        if hasattr(self, 'combo_wm_pos') and self.combo_wm_pos.count() >= 5:
+            self.combo_wm_pos.setItemText(0, tr("wm_pos_br"))
+            self.combo_wm_pos.setItemText(1, tr("wm_pos_bl"))
+            self.combo_wm_pos.setItemText(2, tr("wm_pos_tr"))
+            self.combo_wm_pos.setItemText(3, tr("wm_pos_tl"))
+            self.combo_wm_pos.setItemText(4, tr("wm_pos_center"))
+
+        # Aba Velocidade
+        if hasattr(self, 'lbl_speed_info'): self.lbl_speed_info.setText(tr("lbl_speed_info"))
+        if hasattr(self, 'lbl_exact_speed'): self.lbl_exact_speed.setText(tr("lbl_exact_speed"))
+        if hasattr(self, 'chk_pitch'):
+            self.chk_pitch.setText(tr("chk_preserve_pitch"))
+            self.chk_pitch.setToolTip(tr("chk_preserve_pitch_tt"))
+
+        # Aba Mais
+        if hasattr(self, 'lbl_threads_title'): self.lbl_threads_title.setText(tr("lbl_cpu_threads"))
+        if hasattr(self, 'lbl_extra_args_title'): self.lbl_extra_args_title.setText(tr("lbl_extra_ffmpeg_args"))
+        if hasattr(self, 'entry_extra_args'): self.entry_extra_args.setPlaceholderText(tr("ph_extra_ffmpeg_args"))
+        if hasattr(self, 'lbl_ffmpeg_path_title'): self.lbl_ffmpeg_path_title.setText(tr("lbl_converter_exec"))
+
+        # Aba Marcadores
+        if hasattr(self, 'lbl_tags_warning'): self.lbl_tags_warning.setText(tr("lbl_tags_warning"))
+        if hasattr(self, 'lbl_meta_title'): self.lbl_meta_title.setText(tr("lbl_meta_title"))
+        if hasattr(self, 'entry_meta_title'):
+            self.entry_meta_title.setPlaceholderText(tr("ph_meta_title"))
+            self.entry_meta_title.setToolTip(tr("tt_meta_title"))
+        if hasattr(self, 'lbl_meta_artist'): self.lbl_meta_artist.setText(tr("lbl_meta_artist"))
+        if hasattr(self, 'entry_meta_artist'): self.entry_meta_artist.setPlaceholderText(tr("ph_meta_artist"))
+        if hasattr(self, 'lbl_meta_album'): self.lbl_meta_album.setText(tr("lbl_meta_album"))
+        if hasattr(self, 'entry_meta_album'): self.entry_meta_album.setPlaceholderText(tr("ph_meta_album"))
+        if hasattr(self, 'lbl_meta_year'): self.lbl_meta_year.setText(tr("lbl_meta_year"))
+        if hasattr(self, 'entry_meta_year'): self.entry_meta_year.setPlaceholderText(tr("ph_meta_year"))
+        if hasattr(self, 'lbl_meta_genre'): self.lbl_meta_genre.setText(tr("lbl_meta_genre"))
+        if hasattr(self, 'entry_meta_genre'): self.entry_meta_genre.setPlaceholderText(tr("ph_meta_genre"))
+        if hasattr(self, 'lbl_meta_comment'): self.lbl_meta_comment.setText(tr("lbl_meta_comment"))
+        if hasattr(self, 'entry_meta_comment'): self.entry_meta_comment.setPlaceholderText(tr("ph_meta_comment"))
+        if hasattr(self, 'lbl_meta_cover'): self.lbl_meta_cover.setText(tr("lbl_meta_cover"))
+        if hasattr(self, 'entry_cover_path'): self.entry_cover_path.setPlaceholderText(tr("ph_no_cover"))
+        if hasattr(self, 'btn_choose_cover'): self.btn_choose_cover.setText(tr("btn_choose_image"))
+        if hasattr(self, 'btn_clear_cover'): self.btn_clear_cover.setText(tr("btn_clear_wm"))
+
+        # Página Download
+        if hasattr(self, 'lbl_dl_title'): self.lbl_dl_title.setText(tr("lbl_dl_title"))
+        if hasattr(self, 'lbl_dl_url'): self.lbl_dl_url.setText(tr("lbl_dl_url"))
+        if hasattr(self, 'entry_dl_url'): self.entry_dl_url.setPlaceholderText(tr("ph_dl_url"))
+        if hasattr(self, 'group_dl_config'): self.group_dl_config.setTitle(tr("grp_dl_config"))
+        if hasattr(self, 'lbl_dl_mode'): self.lbl_dl_mode.setText(tr("lbl_dl_mode"))
+        if hasattr(self, 'combo_dl_mode') and self.combo_dl_mode.count() >= 2:
+            self.combo_dl_mode.setItemText(0, tr("dl_mode_video"))
+            self.combo_dl_mode.setItemText(1, tr("dl_mode_audio"))
+        if hasattr(self, 'lbl_dl_max_res'): self.lbl_dl_max_res.setText(tr("lbl_dl_max_res"))
+        if hasattr(self, 'combo_dl_v_res') and self.combo_dl_v_res.count() > 0:
+            self.combo_dl_v_res.setItemText(0, tr("dl_res_best"))
+        if hasattr(self, 'lbl_dl_container_fmt'): self.lbl_dl_container_fmt.setText(tr("lbl_dl_container_fmt"))
+        if hasattr(self, 'lbl_dl_audio_fmt'): self.lbl_dl_audio_fmt.setText(tr("lbl_dl_audio_fmt"))
+        if hasattr(self, 'lbl_dl_audio_quality'): self.lbl_dl_audio_quality.setText(tr("lbl_dl_audio_quality"))
+        if hasattr(self, 'btn_start_dl'): self.btn_start_dl.setText(tr("btn_start_dl"))
+        if hasattr(self, 'btn_stop_dl'): self.btn_stop_dl.setText(tr("btn_stop_dl"))
 
     # ======================================================================
     # DRAG AND DROP EVENTS
@@ -2182,4 +2631,7 @@ class LyraMainWindow(QMainWindow):
                     failed_files.append(file_path)
                     
         if failed_files:
-            QMessageBox.warning(self, "Aviso de Permissão", f"Não foi possível acessar {len(failed_files)} arquivo(s) arrastado(s).\nSe você usa Flatpak, tente conceder permissão de leitura para a pasta do arquivo.")
+            QMessageBox.warning(
+                self, tr("dnd_permission_warning_title"),
+                tr("dnd_permission_warning_msg", count=len(failed_files))
+            )

@@ -52,3 +52,5 @@ project-rules/
 # ==========================================
 .pytest_cache/
 .tox/
+LOG.jpg
+*.log

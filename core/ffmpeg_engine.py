@@ -744,12 +744,12 @@ class FFmpegEngine(QObject):
         if options.get("deinterlace"):
             vf_filters.append("yadif_cuda" if "nvenc" in vcodec else "yadif")
 
-        rotate = options.get("rotate", "Normal")
-        if rotate == "90° Horário": vf_filters.append("transpose=1")
-        elif rotate == "90° Anti-horário": vf_filters.append("transpose=2")
-        elif rotate == "180°": vf_filters.append("transpose=2,transpose=2")
-        elif rotate == "Espelhar Horizontal": vf_filters.append("hflip")
-        elif rotate == "Espelhar Vertical": vf_filters.append("vflip")
+        rotate = options.get("rotate", "normal")
+        if rotate in ("90° Horário", "90_cw", "90_clockwise", "90° Clockwise"): vf_filters.append("transpose=1")
+        elif rotate in ("90° Anti-horário", "90_ccw", "90_counterclockwise", "90° Counter-Clockwise", "90° Antihorario", "90° Anti-horaire"): vf_filters.append("transpose=2")
+        elif rotate in ("180°", "180"): vf_filters.append("transpose=2,transpose=2")
+        elif rotate in ("Espelhar Horizontal", "hflip", "horizontal_flip", "Horizontal Flip", "Voltear Horizontal", "Miroir horizontal", "Horizontal spiegeln", "Rifletti Orizzontale", "Отразить по горизонтали", "水平翻转", "左右反転"): vf_filters.append("hflip")
+        elif rotate in ("Espelhar Vertical", "vflip", "vertical_flip", "Vertical Flip", "Voltear Vertical", "Miroir vertical", "Vertikal spiegeln", "Rifletti Verticale", "Отразить по вертикали", "垂直翻转", "上下反転"): vf_filters.append("vflip")
 
         crop = options.get("crop", {})
         if crop.get("enabled"):
@@ -762,15 +762,15 @@ class FFmpegEngine(QObject):
             vf_filters.append(f"pad=iw+{l}+{r}:ih+{t}+{b}:{l}:{t}:black")
 
         fade_dur = options.get("fade_dur", 0)
-        fade_pos = options.get("fade_pos", "Nenhum")
-        fade_type = options.get("fade_type", "Vídeo e Áudio")
-        if fade_dur > 0 and fade_pos != "Nenhum":
-            do_video = fade_type in ["Vídeo e Áudio", "Somente Vídeo"]
-            do_audio = (fade_type in ["Vídeo e Áudio", "Somente Áudio"]) and not is_audio_copy
-            if fade_pos in ["No início", "Ambos"]:
+        fade_pos = options.get("fade_pos", "none")
+        fade_type = options.get("fade_type", "both")
+        if fade_dur > 0 and fade_pos not in ("Nenhum", "none", "None", "Ninguno", "Aucun", "Keine", "Nessuna", "Нет", "无", "なし", ""):
+            do_video = fade_type in ("Vídeo e Áudio", "Somente Vídeo", "both", "video", "Video and Audio", "Video Only", "Vídeo y Audio", "Solo Vídeo", "Vidéo et Audio", "Vidéo seule", "Video und Audio", "Nur Video", "Video e Audio", "Solo Video", "Видео и аудио", "Только видео", "视频与音频", "仅视频", "動画と音声", "動画のみ")
+            do_audio = (fade_type in ("Vídeo e Áudio", "Somente Áudio", "both", "audio", "Video and Audio", "Audio Only", "Vídeo y Audio", "Solo Audio", "Vidéo et Audio", "Audio seul", "Video und Audio", "Nur Audio", "Video e Audio", "Solo Audio", "Видео и аудио", "Только аудио", "视频与音频", "仅音频", "動画と音声", "音声のみ")) and not is_audio_copy
+            if fade_pos in ("No início", "Ambos", "start", "both", "At start", "Both", "Al inicio", "Au début", "Les deux", "Am Anfang", "Beide", "All'inizio", "Entrambi", "В начале", "В начале и конце", "片头淡入", "首尾两端", "開始時", "両方"):
                 if do_video: vf_filters.append(f"fade=t=in:st=0:d={fade_dur}")
                 if do_audio: af_filters.append(f"afade=t=in:st=0:d={fade_dur}")
-            if fade_pos in ["No final", "Ambos"] and self.current_duration > 0:
+            if fade_pos in ("No final", "Ambos", "end", "both", "At end", "Both", "Al final", "À la fin", "Les deux", "Am Ende", "Beide", "Alla fine", "Entrambi", "В конце", "В начале и конце", "片尾淡出", "首尾两端", "終了時", "両方") and self.current_duration > 0:
                 out_start = max(0, self.current_duration - fade_dur)
                 if do_video: vf_filters.append(f"fade=t=out:st={out_start}:d={fade_dur}")
                 if do_audio: af_filters.append(f"afade=t=out:st={out_start}:d={fade_dur}")
@@ -965,13 +965,18 @@ class FFmpegEngine(QObject):
                 escaped_img = watermark["image_path"].replace('\\', '\\\\').replace(':', '\\:').replace("'", "\\'")
                 size_factor = watermark.get("size", 100) / 100.0
                 opacity = watermark.get("opacity", 100) / 100.0
-                pos = watermark.get("position", "Inferior direito")
+                pos = watermark.get("position", "bottom_right")
                 
-                if pos == "Superior esquerdo": x, y = "10", "10"
-                elif pos == "Superior direito": x, y = "W-w-10", "10"
-                elif pos == "Centro": x, y = "(W-w)/2", "(H-h)/2"
-                elif pos == "Inferior esquerdo": x, y = "10", "H-h-10"
-                else: x, y = "W-w-10", "H-h-10"
+                if pos in ("Superior esquerdo", "top_left", "Top-Left", "En haut à gauche", "Oben links", "In alto a sinistra", "Вверху слева", "左上角", "左上", "Superior izquierda"):
+                    x, y = "10", "10"
+                elif pos in ("Superior direito", "top_right", "Top-Right", "En haut à droite", "Oben rechts", "In alto a destra", "Вверху справа", "右上角", "右上", "Superior derecha"):
+                    x, y = "W-w-10", "10"
+                elif pos in ("Centro", "center", "Center", "Centre", "Mitte", "По центру", "居中", "中央"):
+                    x, y = "(W-w)/2", "(H-h)/2"
+                elif pos in ("Inferior esquerdo", "bottom_left", "Bottom-Left", "En bas à gauche", "Unten links", "In basso a sinistra", "Внизу слева", "左下角", "左下", "Inferior izquierda"):
+                    x, y = "10", "H-h-10"
+                else: # "Inferior direito", "bottom_right", etc.
+                    x, y = "W-w-10", "H-h-10"
                 wm_setup = f"movie='{escaped_img}',format=rgba[wm];[wm]scale=iw*{size_factor}:ih*{size_factor},colorchannelmixer=aa={opacity}[wm_mod]"
                 
                 if vf_filters:
