@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QCheckBox, QSlider, QSpinBox, QDoubleSpinBox, QLineEdit, QGroupBox, QTimeEdit,
     QMessageBox, QSizePolicy, QPlainTextEdit, QSystemTrayIcon, QMenu,
     QStyle, QApplication, QInputDialog, QListWidget, QListWidgetItem, QRadioButton,
-    QProgressBar
+    QProgressBar, QToolButton
 )
 from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices, QStandardItemModel, QPixmap
 from PySide6.QtCore import Qt, QSize, QUrl, QSettings, QTime
@@ -44,14 +44,14 @@ class LyraMainWindow(QMainWindow):
         super().__init__()
         self.settings = QSettings("Lyra", "Lyra-Qt")
         self.version = version
-        self.resource_dir = resource_dir or os.path.dirname(os.path.abspath(__file__))
+        self.resource_dir = resource_dir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         # Inicializa o subsistema de internacionalização
         i18n.reinit_resource_dir(self.resource_dir)
 
         self.setWindowTitle(tr("app_title", version=self.version))
-        self.resize(1050, 700)
-        self.setMinimumSize(950, 550)
+        self.resize(1180, 720)
+        self.setMinimumSize(1040, 600)
         self.setAcceptDrops(True)
 
         icon_path = os.path.join(self.resource_dir, "assets", "icons", "lyra.svg")
@@ -272,7 +272,25 @@ class LyraMainWindow(QMainWindow):
         self.toolbar = QToolBar(tr("toolbar_title"))
         self.toolbar.setMovable(False)
         self.addToolBar(Qt.TopToolBarArea, self.toolbar)
-        self.toolbar.setStyleSheet("QToolBar QToolButton { font-size: 14px; padding: 4px; font-weight: bold; }")
+        self.toolbar.setStyleSheet("""
+            QToolBar {
+                spacing: 2px;
+            }
+            QToolBar QToolButton {
+                font-size: 13px;
+                padding: 3px 5px;
+                font-weight: bold;
+                border: 1px solid transparent;
+                border-radius: 4px;
+            }
+            QToolBar QToolButton:hover {
+                background-color: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+            }
+            QToolBar QToolButton:pressed {
+                background-color: rgba(255, 255, 255, 0.15);
+            }
+        """)
 
         self.action_add_file = QAction(tr("action_add_file"), self)
         self.action_add_file.setShortcut("Ctrl+O")
@@ -298,44 +316,81 @@ class LyraMainWindow(QMainWindow):
         self.action_advanced.setShortcut("Ctrl+E")
         self.action_advanced.setToolTip(tr("action_advanced_tt"))
 
-        self.toolbar.addAction(self.action_add_file)
-        self.toolbar.addAction(self.action_add_folder)
-        self.toolbar.addSeparator()
-        self.toolbar.addAction(self.action_remove)
-        self.toolbar.addAction(self.action_clear)
-        self.toolbar.addSeparator()
-        self.toolbar.addAction(self.action_download)
-        self.toolbar.addAction(self.action_advanced)
+        # Registra as ações na janela principal para preservar atalhos globais de teclado
+        for act in (self.action_add_file, self.action_add_folder, self.action_remove,
+                    self.action_clear, self.action_download, self.action_advanced):
+            self.addAction(act)
+
+        # Contêiner flexível e responsivo com QHBoxLayout para os botões da toolbar
+        self.toolbar_container = QWidget()
+        self.toolbar_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        container_layout = QHBoxLayout(self.toolbar_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(2)
+
+        def create_tool_btn(action):
+            btn = QToolButton()
+            btn.setDefaultAction(action)
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            btn.setMinimumWidth(80)
+            btn.setMaximumWidth(210)
+            return btn
+
+        def create_sep():
+            sep = QFrame()
+            sep.setFrameShape(QFrame.VLine)
+            sep.setFrameShadow(QFrame.Plain)
+            sep.setFixedWidth(3)
+            sep.setStyleSheet("color: rgba(255, 255, 255, 0.35); margin: 5px 0px;")
+            return sep
+
+        self.btn_tool_add_file = create_tool_btn(self.action_add_file)
+        self.btn_tool_add_folder = create_tool_btn(self.action_add_folder)
+        self.btn_tool_remove = create_tool_btn(self.action_remove)
+        self.btn_tool_clear = create_tool_btn(self.action_clear)
+        self.btn_tool_download = create_tool_btn(self.action_download)
+        self.btn_tool_advanced = create_tool_btn(self.action_advanced)
+
+        tool_buttons = [
+            self.btn_tool_add_file,
+            self.btn_tool_add_folder,
+            self.btn_tool_remove,
+            self.btn_tool_clear,
+            self.btn_tool_download,
+            self.btn_tool_advanced
+        ]
+
+        for i, b in enumerate(tool_buttons):
+            container_layout.addWidget(b, max(b.sizeHint().width(), 80))
+            if i < len(tool_buttons) - 1:
+                container_layout.addWidget(create_sep(), 0)
+
+        # Separador consistente antes dos botões de converter/parar
+        container_layout.addWidget(create_sep(), 0)
 
         self.btn_convert = QPushButton(tr("btn_convert"))
-        self.btn_convert.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold; padding: 6px 15px; font-size: 13px;")
+        self.btn_convert.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold; padding: 4px 10px; font-size: 13px;")
         self.btn_convert.clicked.connect(self.start_conversion_queue)
 
         self.btn_stop = QPushButton(tr("btn_stop"))
-        self.btn_stop.setStyleSheet("background-color: #C62828; color: white; font-weight: bold; padding: 6px 15px; font-size: 13px;")
+        self.btn_stop.setStyleSheet("background-color: #C62828; color: white; font-weight: bold; padding: 4px 10px; font-size: 13px;")
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self.stop_conversion_queue)
 
         self.btn_convert.setShortcut("F5")
         self.btn_stop.setShortcut("Escape")
 
-        # Espaçamento visual antes dos botões de ação
-        spacer_small = QWidget()
-        spacer_small.setFixedWidth(20)
-        self.toolbar.addWidget(spacer_small)
+        container_layout.addWidget(self.btn_convert, 0)
+        container_layout.addWidget(self.btn_stop, 0)
 
-        self.toolbar.addWidget(self.btn_convert)
-        self.toolbar.addWidget(self.btn_stop)
-
-        # Espaçador dinâmico
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.toolbar.addWidget(spacer)
+        # Espaçador dinâmico: absorve o excedente de espaço quando os botões atingem o maxWidth
+        container_layout.addStretch(0)
 
         # Seletor de Idioma na Toolbar
         self.combo_language = QComboBox()
-        self.combo_language.setMinimumWidth(160)
-        self.combo_language.setStyleSheet("font-size: 12px; font-weight: bold; padding: 3px 8px;")
+        self.combo_language.setMinimumWidth(130)
+        self.combo_language.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.combo_language.setStyleSheet("font-size: 11px; font-weight: bold; padding: 2px 6px;")
         for code, name in SUPPORTED_LANGUAGES.items():
             self.combo_language.addItem(f"🌐 {name}", code)
         cur_lang = i18n.get_current_language()
@@ -343,7 +398,9 @@ class LyraMainWindow(QMainWindow):
         if lang_idx != -1:
             self.combo_language.setCurrentIndex(lang_idx)
         self.combo_language.currentIndexChanged.connect(self._on_language_selector_changed)
-        self.toolbar.addWidget(self.combo_language)
+        container_layout.addWidget(self.combo_language, 0)
+
+        self.toolbar.addWidget(self.toolbar_container)
 
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
@@ -376,7 +433,7 @@ class LyraMainWindow(QMainWindow):
         self.lbl_format = QLabel(tr("lbl_format"))
         self.combo_format = QComboBox()
         self.combo_format.addItems(["MP4", "MKV", "WEBM", "AVI", "MP3", "OGG", "OPUS", "WAV", "JPG", "PNG", "GIF", "BMP", "WEBP", "SRT"])
-        self.combo_format.setMinimumWidth(150)
+        self.combo_format.setMinimumWidth(110)
         format_layout.addWidget(self.lbl_format)
         format_layout.addWidget(self.combo_format)
         
@@ -386,7 +443,7 @@ class LyraMainWindow(QMainWindow):
         format_layout.addWidget(self.btn_clone_specs)
         
         self.combo_presets = QComboBox()
-        self.combo_presets.setMinimumWidth(200)
+        self.combo_presets.setMinimumWidth(160)
         self.combo_presets.currentIndexChanged.connect(self.on_preset_selected)
 
         self.btn_save_preset = QPushButton(tr("btn_save_preset"))
@@ -441,7 +498,7 @@ class LyraMainWindow(QMainWindow):
                 os.makedirs(saved_dest, exist_ok=True)
         self.lbl_dest_path = QLabel(saved_dest)
         self.lbl_dest_path.setFrameStyle(QFrame.Panel | QFrame.Sunken)
-        self.lbl_dest_path.setMinimumWidth(300)
+        self.lbl_dest_path.setMinimumWidth(200)
         self.btn_browse_dest = QPushButton(tr("btn_browse_dest"))
         self.btn_browse_dest.clicked.connect(self.browse_destination)
         self.btn_open_dest = QPushButton(tr("btn_open_dest"))
@@ -2351,6 +2408,16 @@ class LyraMainWindow(QMainWindow):
             self.btn_convert.setText(tr("btn_convert"))
         if hasattr(self, 'btn_stop'):
             self.btn_stop.setText(tr("btn_stop"))
+
+        # Atualiza fatores de estiramento proporcional dos botões na troca de idioma
+        if hasattr(self, 'toolbar_container') and hasattr(self, 'btn_tool_add_file'):
+            clayout = self.toolbar_container.layout()
+            if clayout:
+                for b in (self.btn_tool_add_file, self.btn_tool_add_folder, self.btn_tool_remove,
+                          self.btn_tool_clear, self.btn_tool_download, self.btn_tool_advanced):
+                    idx = clayout.indexOf(b)
+                    if idx != -1:
+                        clayout.setStretch(idx, max(b.sizeHint().width(), 80))
 
         # Tela Principal
         if hasattr(self, 'lbl_format'):

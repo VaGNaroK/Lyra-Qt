@@ -174,7 +174,7 @@ def test_gui_live_retranslation(qtbot, resource_dir):
         from gui.main_window import LyraMainWindow
         from core.i18n import i18n
         
-        window = LyraMainWindow("1.1.22", resource_dir)
+        window = LyraMainWindow("1.1.23", resource_dir)
         qtbot.addWidget(window)
 
         # 1. Muda para inglês

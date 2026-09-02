@@ -26,7 +26,7 @@
   "action_download_tt": "打开工具直接从网页链接下载音视频 (Ctrl+D)。",
   "action_advanced": "⚙️ 高级选项",
   "action_advanced_tt": "访问详细设置，如画质、滤镜、剪辑和元数据 (Ctrl+E)。",
-  "action_back_to_list": "↩️ 返回列表",
+  "action_back_to_list": "↩️ 返回",
   "btn_convert": "🚀 开始转换",
   "btn_stop": "🛑 停止",
   "lbl_format": "🎬 输出格式:",

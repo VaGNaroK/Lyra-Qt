@@ -2,6 +2,22 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.23] - 2026-09-01
+
+### Adicionado
+* **Barra de Ferramentas com Layout Flexível e Responsivo:** Os botões da barra superior (`Adicionar Arquivo`, `Adicionar Pasta`, `Remover`, `Limpar Lista`, `Baixar Web`, `Avançado`) foram migrados para um contêiner flexível coordenado (`QHBoxLayout`), expandindo e contraindo proporcionalmente conforme a janela é redimensionada, respeitando limites ergonômicos (mínimo de 80px e máximo de 210px).
+* **Barras Divisórias Uniformes na Barra de Ferramentas:** Inseridos separadores verticais visuais (`QFrame.VLine`) de forma consistente entre cada botão da barra de ferramentas, aprimorando a consistência e a experiência do usuário (UX).
+* **Testes Automatizados de Layout e Responsividade:** Criada suíte de testes em `tests/test_toolbar_layout.py` validando o redimensionamento proporcional dos botões, dimensões padrão/mínimas da janela e a visibilidade de 100% dos controles em todos os 9 idiomas suportados.
+
+### Corrigido
+* **Overflow e Corte no Seletor de Idioma e Botões da Toolbar (`🔒 FIX`):** Corrigido bug em que a barra de ferramentas excedia a largura da janela ao alternar para idiomas com textos longos (como Espanhol ou Alemão), causando corte ou desaparecimento do dropdown de idioma e do botão Parar.
+* **Resolução do `resource_dir` no Fallback do `LyraMainWindow`:** Ajustado o fallback de caminho para apontar corretamente para a raiz do projeto (`os.path.dirname(os.path.dirname(os.path.abspath(__file__)))`), prevenindo avisos de recursos e ícones SVG não encontrados em execuções de testes.
+
+### Alterado
+* **Tipografia e Proporções da Barra de Ferramentas:** Aumentado o tamanho da fonte dos botões da barra de ferramentas e dos botões de ação (`Converter` / `Parar`) para 13px bold com padding otimizado, proporcionando maior legibilidade e conforto visual.
+* **Otimização de Textos das Ações nos 9 Idiomas:** Adequação de rótulos excessivamente longos nos catálogos de tradução JSON para formatos clássicos e concisos de software desktop.
+* **Dimensões Padrão da Janela:** Ajustado o tamanho inicial para 1180x720 e o tamanho mínimo protegido para 1040x600.
+
 ## [1.1.22] - 2026-08-30
 
 ### Adicionado
