@@ -45,11 +45,79 @@ Se o áudio do seu vídeo está estourando, abafado ou cheio de chiado de vento:
 * **Leveler / DRC (Normalizador de Volume):** Equaliza o áudio. Levanta o volume das vozes suaves e abaixa o estouro das explosões.
 * **Remoção de Ruído com IA (RNNN):** Isola a voz humana, apagando o chiado do vento e os ruídos de fundo.
 
-### 🎥 Aba de Vídeo (Estilo Handbrake)
-Se você quer controle absoluto sobre a imagem, o painel de Vídeo oferece recursos profissionais de estúdio (Encoder Settings):
-* **Qualidade Inteligente (CRF):** Um slider que controla a qualidade visual. `23` é o normal, números menores = qualidade insana (mas arquivo gigante), números maiores = menor tamanho (mas imagem mais borrada).
-* **2-Pass (Duas Passadas) e Turbo Pass:** Se desmarcar a Qualidade CRF, você pode limitar o tamanho definindo o "Bitrate". O **2-Pass** garante a melhor qualidade possível dentro desse limite e o **Turbo Pass** acelera dramaticamente a primeira passada de análise!
-* **Otimização de Codificador:** Você pode trocar o *Preset* (de `ultrafast` para `placebo`), mudar o *Tune* (como `film` para filmes reais ou `animation` para animes), definir *Profiles/Levels* e escolher *CFR/VFR* dependendo se a taxa de quadros for travada ou dinâmica.
+### 🎥 Aba de Vídeo (Controles de Estúdio e Otimização do Codificador)
+
+A aba de Vídeo do Lyra foi desenhada com inspiração nas melhores ferramentas profissionais de estúdio (como o HandBrake e FFmpeg avançado), oferecendo controle cirúrgico sobre como o vídeo é processado:
+
+#### 1. Configurações Básicas e Qualidade
+* **Taxa de Quadros (FPS) - CFR vs VFR:**
+  * **CFR (Constant Frame Rate / Taxa Constante):** Trava a quantidade de quadros por segundo rigorosamente (ex: 30.00 ou 60.00 fps fixos). É **obrigatório** caso você planeje importar o vídeo em editores como Adobe Premiere, DaVinci Resolve ou Final Cut, pois evita que o áudio saia de sincronia ao longo da linha do tempo.
+  * **VFR (Variable Frame Rate / Taxa Variável):** Permite que a taxa de quadros varie em momentos de pouca ação (típico de celulares e gravações de tela), economizando espaço em disco.
+* **Qualidade Inteligente (CRF - Constant Rate Factor):**
+  * Controla a fidelidade visual perceptual. O padrão recomendado é **23**.
+  * Números menores (ex: 18 a 20): Qualidade visual praticamente indistinguível do original (Master de cinema), com arquivo maior.
+  * Números maiores (ex: 26 a 28): Alta compressão para arquivos super leves, ideal para compartilhamento rápido ou mensagens.
+* **2-Pass (Duas Passadas) e Turbo First Pass:**
+  * Usado quando você desmarca o CRF e escolhe um Bitrate alvo fixo (ex: 2500 kbps). O Lyra analisa todo o vídeo na primeira passada e distribui os bits de forma inteligente na segunda passada, garantindo máxima fidelidade dentro do limite de tamanho.
+  * O **Turbo First Pass** acelera a primeira passada em modo ultra-rápido, economizando até metade do tempo total de conversão!
+
+#### 2. Painel de Otimização do Codificador (`Encoder Optimization`)
+Este painel calibra o comportamento interno dos encoders (`libx264`, `libx265`, etc.):
+
+* **Gama de Cores (Color Range):**
+  * **Auto:** Preserva as propriedades originais do arquivo.
+  * **Limited (Padrão de TV/Streaming):** Faixa de luma 16-235. É o padrão internacional de filmes, séries, YouTube e televisores. Impede que sombras pretas virem borrões sem detalhe em telas de TV.
+  * **Full (Padrão de PC/Data):** Faixa de luma 0-255 total. Ideal para vídeos gravados diretamente no computador (gameplays de PC, capturas de tela com OBS, apresentações), preservando o preto puro e o branco máximo do monitor.
+
+* **Predefinição (Preset):**
+  * Controla o tempo que o processador dedica para encontrar a melhor compactação matemática possível.
+  * *Importante:* O preset **não** altera a qualidade visual quando o CRF está ativo; ele altera o **tamanho final do arquivo** para a mesma qualidade!
+  * **ultrafast / superfast / veryfast:** Codificação instantânea com compressão simples. Gera arquivos maiores, mas converte quase instantaneamente. Ideal para testes ou computadores modestos.
+  * **medium (Padrão):** O equilíbrio perfeito entre tempo de espera e economia de espaço em disco.
+  * **slow / slower:** Realiza cálculos profundos de vetores de movimento. Demora mais para processar, porém entrega arquivos até 10-15% menores mantendo a mesma nitidez visual. Recomendado para guardar filmes definitivos no HD.
+  * **veryslow / placebo:** Compressão exaustiva com ganhos marginais.
+
+* **Ajuste Fino (Tune):**
+  * Calibra as matrizes psicovisuais do encoder de acordo com o tipo de imagem gravada:
+    * **none:** Uso geral padrão.
+    * **film:** Para filmes e séries live-action com pessoas reais (preserva contraste e bordas naturais).
+    * **animation:** Para desenhos animados, animes e arte vetorial 2D/3D. Mantém traços pretos afiados e áreas uniformes de cor sem ruídos de compressão.
+    * **grain:** Para filmes clássicos ou obras com granulado de película analógica. Evita que o encoder tente "limpar" o grão do filme, mantendo a textura cinematográfica original.
+    * **fastdecode:** Desativa recursos pesados de descompressão, facilitando a reprodução em dispositivos lentos.
+    * **zerolatency:** Elimina buffers e lookahead para transmissões com latência zero.
+
+* **Perfil (Profile):**
+  * Estabelece os recursos de decodificação que o reprodutor final deve suportar:
+    * **auto:** Permite ao encoder escolher a melhor opção automaticamente.
+    * **baseline:** Modo legado sem recursos modernos. Ideal para aparelhos muito antigos (smartphones de 2010 ou centrais multimídia automotivas antigas).
+    * **main:** Padrão clássico de TV digital aberta.
+    * **high (Recomendado):** O padrão universal para vídeos modernos em 1080p (compatível com 100% dos navegadores, Smart TVs e celulares atuais).
+    * **high10:** Suporte nativo a profundidade de 10 bits, eliminando o efeito de faixas (*color banding*) em céus e cenas escuras.
+
+* **Nível (Level):**
+  * Define os limites de hardware (resolução máxima, bitrate e fps aceitos pelo chip gráfico):
+    * **auto (Recomendado):** Calcula automaticamente a melhor compatibilidade.
+    * **3.1:** Para telas pequenas até 720p @ 30fps.
+    * **4.0 / 4.1:** Padrão universal do Blu-ray e YouTube 1080p @ 30fps.
+    * **5.1 / 5.2:** Projetado para reproduzir mídias pesadas em 4K UHD @ 60fps.
+
+* **Decodificação Rápida (Fast Decode):**
+  * Caixa de seleção rápida que injeta flags para aliviar o consumo de bateria e processamento na hora de assistir. Recomendado para dispositivos fracos.
+
+* **Opções Extras do x264/x265 (Custom Parameters):**
+  * Permite que usuários avançados passem parâmetros internos diretos para a biblioteca do encoder (ex: `no-sao=1` no x265 para impedir que rostos fiquem excessivamente "emborrachados" ou plastificados).
+
+* **Apenas Vídeo (Sem Áudio) & Corrigir Índice Quebrado (Bad Index):**
+  * **Apenas Vídeo:** Remove completamente qualquer áudio (`-an`), útil para B-rolls e telas de espera.
+  * **Corrigir Índice Quebrado:** Aplica `-fflags +genpts`, gerando novos carimbos de tempo para vídeos danificados da web que travam ao tentar pular cenas.
+
+#### 💡 Guia Rápido de "Receitas" Recomendadas:
+* 🍿 **Filmes e Séries:** `Preset: slow` + `Tune: film` + `Profile: high` + `CRF: 21 a 23`.
+* 🎌 **Animes e Desenhos:** `Preset: medium` + `Tune: animation` + `Profile: high10` (se fonte for 10-bit) ou `high`.
+* 🎮 **Gameplays de PC (Gravados em RGB):** `Color Range: Full` + `FPS Mode: CFR` + `Preset: fast ou medium`.
+* 📺 **Máxima Compatibilidade com TVs / Aparelhos Antigos:** `Color Range: Limited` + `Profile: high` + `Level: 4.1` + `Fast Decode: Marcado`.
+* 🎬 **Edição no Premiere / DaVinci Resolve:** `FPS Mode: CFR` (obrigatório para sincronia perfeita de áudio).
+
 
 ### ⏱️ Aba de Velocidade
 Quer o vídeo mais rápido ou mais devagar? 
