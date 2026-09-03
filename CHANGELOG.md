@@ -2,6 +2,24 @@
 
 Todas as alterações notáveis no Lyra Multimedia Converter serão documentadas neste arquivo.
 
+## [1.1.24] - 2026-09-03
+
+### Adicionado
+* **Checkbox Mestre na Tabela de Arquivos (`🔒 UX`):** Clique no cabeçalho da primeira coluna (`☑️ Converter`) agora alterna a seleção de todos os itens da fila entre marcados e desmarcados em um único clique.
+* **Empty State com Dica de Arraste (*Dropzone*):** Implementada mensagem sutil e centralizada no viewport da tabela de arquivos quando vazia (`📥 Arraste e solte vídeos, áudios ou imagens aqui...`), desaparecendo automaticamente quando mídias são adicionadas.
+* **Novas Chaves de Tradução nos 9 Idiomas:** Inseridas as chaves `lbl_if_exists` e `empty_table_hint` em todos os catálogos JSON com suporte completo à internacionalização dinâmica.
+* **Testes Automatizados para Recursos de UX:** Adicionados testes unitários em `tests/test_toolbar_layout.py` cobrindo o Checkbox Mestre, a exibição/ocultação do Empty State, a nova ordenação do rodapé de destino e o estilo com estados `:disabled` dos botões.
+
+### Corrigido
+* **Desacoplamento e Correção Semântica de Destino vs Conflito (`🔒 FIX`):** O combobox de ação para arquivos existentes (`Sobrescrever`) estava posicionado imediatamente após o rótulo `Destino:`, induzindo o usuário ao erro de interpretação "Destino: Sobrescrever". O rodapé agora apresenta a pasta de destino em primeiro plano (`📁 Destino: [/caminho...] [Procurar] [Abrir]`), seguido por um divisor visual e pelo novo rótulo dedicado `⚠️ Se já existir: [Sobrescrever ▼]`.
+* **Inversão Semântica do Cabeçalho da Tabela (`th_skip`):** O cabeçalho da coluna 0 foi renomeado de `⏭️ Pular` para `☑️ Converter` (e variantes nos demais 8 idiomas), alinhando a intenção do checkbox marcado com o comportamento real de conversão do arquivo.
+* **Falso-Ativo no Botão Parar e Converter (`:disabled` CSS):** O botão `Parar` possuía folha de estilo fixa em vermelho vibrante sem regras para o estado desabilitado, parecendo acionável mesmo quando nenhuma conversão estava rodando. Aplicado CSS completo com pseudo-classes `:hover`, `:pressed` e `:disabled` (acinzentado escuro enquanto inativo) para `btn_stop`, `btn_convert`, `btn_stop_dl` e `btn_start_dl`.
+* **Corte Visual na Seleção da Linha da Tabela:** Harmonizadas as margens e a paleta de seleção da tabela (`#1b3d68` slate dark) com as células do `QProgressBar`.
+* **Mock do Reprodutor MPV em Testes Isolados:** Ajustado o mock em `tests/test_i18n.py` para utilizar uma subclasse de `QWidget`, prevenindo exceções de `TypeError` ao executar testes de re-tradução de forma isolada.
+
+### Alterado
+* **Reorganização Lógica da Barra de Formato e Presets:** Inserido separador visual entre a seleção de formato de saída e o agrupamento de perfis, e realocado o botão `🧠 Clonar Info` para junto das ações de gerenciamento de presets (`Salvar`, `Clonar`, `Restaurar`, `Remover`).
+
 ## [1.1.23] - 2026-09-01
 
 ### Adicionado

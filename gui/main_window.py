@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QProgressBar, QToolButton
 )
 from PySide6.QtGui import QAction, QTextCursor, QIcon, QScreen, QDesktopServices, QStandardItemModel, QPixmap
-from PySide6.QtCore import Qt, QSize, QUrl, QSettings, QTime
+from PySide6.QtCore import Qt, QSize, QUrl, QSettings, QTime, QEvent
 from PySide6.QtMultimedia import QSoundEffect
 from gui.mpv_widget import MPVPlayerWidget
 
@@ -132,6 +132,37 @@ class LyraMainWindow(QMainWindow):
             x = (screen_geometry.width() - self.width()) // 2
             y = (screen_geometry.height() - self.height()) // 2
             self.move(x, y)
+
+    def eventFilter(self, watched, event):
+        if hasattr(self, 'table_files') and watched == self.table_files.viewport():
+            if event.type() == QEvent.Resize and hasattr(self, 'lbl_empty_state'):
+                self.lbl_empty_state.setGeometry(self.table_files.viewport().rect())
+        return super().eventFilter(watched, event)
+
+    def _update_empty_state(self):
+        """Atualiza a visibilidade e geometria da dica de arraste da tabela."""
+        if hasattr(self, 'lbl_empty_state') and hasattr(self, 'table_files'):
+            if self.table_files.rowCount() == 0:
+                self.lbl_empty_state.setGeometry(self.table_files.viewport().rect())
+                self.lbl_empty_state.show()
+            else:
+                self.lbl_empty_state.hide()
+
+    def _on_table_header_clicked(self, logical_index):
+        """
+        🔒 UX: Checkbox Mestre no cabeçalho da tabela (coluna 0).
+        Alterna o estado de seleção de todos os arquivos da lista em um clique.
+        """
+        if logical_index == 0 and hasattr(self, 'table_files') and self.table_files.rowCount() > 0:
+            all_checked = all(
+                self.table_files.item(r, 0) and self.table_files.item(r, 0).checkState() == Qt.Checked
+                for r in range(self.table_files.rowCount())
+            )
+            new_state = Qt.Unchecked if all_checked else Qt.Checked
+            for r in range(self.table_files.rowCount()):
+                item = self.table_files.item(r, 0)
+                if item:
+                    item.setCheckState(new_state)
 
     def _play_done_sound(self):
         """
@@ -369,11 +400,27 @@ class LyraMainWindow(QMainWindow):
         container_layout.addWidget(create_sep(), 0)
 
         self.btn_convert = QPushButton(tr("btn_convert"))
-        self.btn_convert.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold; padding: 4px 10px; font-size: 13px;")
+        self.btn_convert.setStyleSheet("""
+            QPushButton {
+                background-color: #2E7D32; color: white; font-weight: bold;
+                padding: 4px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #388E3C;
+            }
+            QPushButton:hover { background-color: #388E3C; }
+            QPushButton:pressed { background-color: #1B5E20; }
+            QPushButton:disabled { background-color: #243526; color: #6a7d6c; border: 1px solid #2e4231; }
+        """)
         self.btn_convert.clicked.connect(self.start_conversion_queue)
 
         self.btn_stop = QPushButton(tr("btn_stop"))
-        self.btn_stop.setStyleSheet("background-color: #C62828; color: white; font-weight: bold; padding: 4px 10px; font-size: 13px;")
+        self.btn_stop.setStyleSheet("""
+            QPushButton {
+                background-color: #C62828; color: white; font-weight: bold;
+                padding: 4px 12px; font-size: 13px; border-radius: 4px; border: 1px solid #D32F2F;
+            }
+            QPushButton:hover { background-color: #D32F2F; }
+            QPushButton:pressed { background-color: #8E0000; }
+            QPushButton:disabled { background-color: #382525; color: #7a6060; border: 1px solid #482f2f; }
+        """)
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self.stop_conversion_queue)
 
@@ -431,17 +478,23 @@ class LyraMainWindow(QMainWindow):
 
         format_layout = QHBoxLayout()
         self.lbl_format = QLabel(tr("lbl_format"))
+        self.lbl_format.setStyleSheet("font-weight: bold;")
         self.combo_format = QComboBox()
         self.combo_format.addItems(["MP4", "MKV", "WEBM", "AVI", "MP3", "OGG", "OPUS", "WAV", "JPG", "PNG", "GIF", "BMP", "WEBP", "SRT"])
         self.combo_format.setMinimumWidth(110)
         format_layout.addWidget(self.lbl_format)
         format_layout.addWidget(self.combo_format)
         
-        self.btn_clone_specs = QPushButton(tr("btn_clone_specs"))
-        self.btn_clone_specs.setToolTip(tr("btn_clone_specs_tt"))
-        self.btn_clone_specs.clicked.connect(self.clone_video_specs)
-        format_layout.addWidget(self.btn_clone_specs)
-        
+        # Divisor visual sutil entre Formato e Presets
+        sep_format = QFrame()
+        sep_format.setFrameShape(QFrame.VLine)
+        sep_format.setFrameShadow(QFrame.Plain)
+        sep_format.setFixedWidth(3)
+        sep_format.setStyleSheet("color: rgba(255, 255, 255, 0.35); margin: 3px 8px;")
+        format_layout.addWidget(sep_format)
+
+        self.lbl_presets = QLabel(tr("lbl_presets"))
+        self.lbl_presets.setStyleSheet("font-weight: bold;")
         self.combo_presets = QComboBox()
         self.combo_presets.setMinimumWidth(160)
         self.combo_presets.currentIndexChanged.connect(self.on_preset_selected)
@@ -450,20 +503,24 @@ class LyraMainWindow(QMainWindow):
         self.btn_save_preset.setToolTip(tr("btn_save_preset_tt"))
         self.btn_save_preset.clicked.connect(self.save_new_preset)
 
-        self.btn_delete_preset = QPushButton(tr("btn_delete_preset"))
-        self.btn_delete_preset.setToolTip(tr("btn_delete_preset_tt"))
-        self.btn_delete_preset.clicked.connect(self.delete_selected_preset)
-        self.btn_delete_preset.setEnabled(False)
+        self.btn_clone_specs = QPushButton(tr("btn_clone_specs"))
+        self.btn_clone_specs.setToolTip(tr("btn_clone_specs_tt"))
+        self.btn_clone_specs.clicked.connect(self.clone_video_specs)
 
         self.btn_reset_all = QPushButton(tr("btn_reset_all"))
         self.btn_reset_all.setToolTip(tr("btn_reset_all_tt"))
         self.btn_reset_all.clicked.connect(self._trigger_hard_reset)
 
-        self.lbl_presets = QLabel(tr("lbl_presets"))
+        self.btn_delete_preset = QPushButton(tr("btn_delete_preset"))
+        self.btn_delete_preset.setToolTip(tr("btn_delete_preset_tt"))
+        self.btn_delete_preset.clicked.connect(self.delete_selected_preset)
+        self.btn_delete_preset.setEnabled(False)
+
         format_layout.addWidget(self.lbl_presets)
         format_layout.addWidget(self.combo_presets)
-        format_layout.addWidget(self.btn_reset_all)
         format_layout.addWidget(self.btn_save_preset)
+        format_layout.addWidget(self.btn_clone_specs)
+        format_layout.addWidget(self.btn_reset_all)
         format_layout.addWidget(self.btn_delete_preset)
         format_layout.addStretch()
         main_layout.addLayout(format_layout)
@@ -473,21 +530,62 @@ class LyraMainWindow(QMainWindow):
             tr("th_skip"), tr("th_file"), tr("th_size"), tr("th_duration"),
             tr("th_est_size"), tr("th_elapsed"), tr("th_remaining"), tr("th_progress")
         ])
-        self.table_files.setStyleSheet("QHeaderView::section { font-size: 13px; font-weight: bold; }")
+        self.table_files.setStyleSheet("""
+            QTableWidget {
+                background-color: #1e1e1e;
+                alternate-background-color: #242424;
+                selection-background-color: #1b3d68;
+                selection-color: #ffffff;
+                gridline-color: #333333;
+                border: 1px solid #383838;
+                border-radius: 4px;
+            }
+            QHeaderView::section {
+                background-color: #2b2b2b;
+                color: #e0e0e0;
+                font-size: 12px;
+                font-weight: bold;
+                padding: 5px;
+                border: 1px solid #383838;
+            }
+            QTableWidget::item:selected {
+                background-color: #1b3d68;
+                color: #ffffff;
+            }
+        """)
         self.table_files.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table_files.setAlternatingRowColors(True)
         self.table_files.verticalHeader().setVisible(False)
-        self.table_files.setColumnWidth(0, 85)
+        self.table_files.setColumnWidth(0, 105)
         self.table_files.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         for i in range(2, 7):
             self.table_files.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
-        self.table_files.setColumnWidth(7, 120)
+        self.table_files.setColumnWidth(7, 130)
         self.table_files.itemSelectionChanged.connect(self.on_file_selected_for_info)
+
+        # 🔒 Checkbox Mestre na coluna 0 (marcar / desmarcar todos)
+        self.table_files.horizontalHeader().sectionClicked.connect(self._on_table_header_clicked)
         main_layout.addWidget(self.table_files)
 
+        # 🔒 UX: Empty State / Dica de arraste quando a tabela estiver vazia
+        self.lbl_empty_state = QLabel(tr("empty_table_hint"), self.table_files)
+        self.lbl_empty_state.setAlignment(Qt.AlignCenter)
+        self.lbl_empty_state.setStyleSheet("""
+            QLabel {
+                color: rgba(255, 255, 255, 0.40);
+                font-size: 14px;
+                font-weight: 500;
+                background: transparent;
+                padding: 20px;
+            }
+        """)
+        self.lbl_empty_state.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.table_files.viewport().installEventFilter(self)
+        self._update_empty_state()
+
         dest_layout = QHBoxLayout()
-        self.combo_exist_action = QComboBox()
-        self.combo_exist_action.addItems([tr("exist_overwrite"), tr("exist_rename"), tr("exist_skip")])
+        dest_layout.setSpacing(6)
+
         default_dest = os.path.join(os.path.expanduser("~"), "Vídeos", "Lyra")
         saved_dest = self.settings.value("last_destination", default_dest)
         if not os.path.exists(saved_dest):
@@ -496,6 +594,9 @@ class LyraMainWindow(QMainWindow):
             except Exception:
                 saved_dest = default_dest
                 os.makedirs(saved_dest, exist_ok=True)
+
+        self.lbl_dest_title = QLabel(tr("lbl_destination"))
+        self.lbl_dest_title.setStyleSheet("font-weight: bold;")
         self.lbl_dest_path = QLabel(saved_dest)
         self.lbl_dest_path.setFrameStyle(QFrame.Panel | QFrame.Sunken)
         self.lbl_dest_path.setMinimumWidth(200)
@@ -504,12 +605,28 @@ class LyraMainWindow(QMainWindow):
         self.btn_open_dest = QPushButton(tr("btn_open_dest"))
         self.btn_open_dest.clicked.connect(self.open_destination_folder)
         
-        self.lbl_dest_title = QLabel(tr("lbl_destination"))
+        # 1. Destino primeiro
         dest_layout.addWidget(self.lbl_dest_title)
-        dest_layout.addWidget(self.combo_exist_action)
         dest_layout.addWidget(self.lbl_dest_path)
         dest_layout.addWidget(self.btn_browse_dest)
         dest_layout.addWidget(self.btn_open_dest)
+
+        # Divisor sutil entre Destino e Se Existir
+        sep_dest = QFrame()
+        sep_dest.setFrameShape(QFrame.VLine)
+        sep_dest.setFrameShadow(QFrame.Plain)
+        sep_dest.setFixedWidth(3)
+        sep_dest.setStyleSheet("color: rgba(255, 255, 255, 0.35); margin: 3px 8px;")
+        dest_layout.addWidget(sep_dest)
+
+        # 2. Ação se o arquivo já existir
+        self.lbl_if_exists = QLabel(tr("lbl_if_exists"))
+        self.lbl_if_exists.setStyleSheet("font-weight: bold;")
+        self.combo_exist_action = QComboBox()
+        self.combo_exist_action.addItems([tr("exist_overwrite"), tr("exist_rename"), tr("exist_skip")])
+        dest_layout.addWidget(self.lbl_if_exists)
+        dest_layout.addWidget(self.combo_exist_action)
+
         dest_layout.addStretch()
         
         self.lbl_post_action = QLabel(tr("lbl_post_action"))
@@ -645,10 +762,26 @@ class LyraMainWindow(QMainWindow):
 
         btn_dl_layout = QHBoxLayout()
         self.btn_start_dl = QPushButton(tr("btn_start_dl"))
-        self.btn_start_dl.setStyleSheet("background-color: #0277BD; color: white; font-weight: bold; padding: 6px 20px;")
+        self.btn_start_dl.setStyleSheet("""
+            QPushButton {
+                background-color: #0277BD; color: white; font-weight: bold;
+                padding: 6px 20px; font-size: 13px; border-radius: 4px; border: 1px solid #039BE5;
+            }
+            QPushButton:hover { background-color: #039BE5; }
+            QPushButton:pressed { background-color: #01579B; }
+            QPushButton:disabled { background-color: #1f303b; color: #5b7180; border: 1px solid #283e4c; }
+        """)
         self.btn_start_dl.clicked.connect(self.start_download)
         self.btn_stop_dl = QPushButton(tr("btn_stop_dl"))
-        self.btn_stop_dl.setStyleSheet("background-color: #C62828; color: white; font-weight: bold; padding: 6px 20px;")
+        self.btn_stop_dl.setStyleSheet("""
+            QPushButton {
+                background-color: #C62828; color: white; font-weight: bold;
+                padding: 6px 20px; font-size: 13px; border-radius: 4px; border: 1px solid #D32F2F;
+            }
+            QPushButton:hover { background-color: #D32F2F; }
+            QPushButton:pressed { background-color: #8E0000; }
+            QPushButton:disabled { background-color: #382525; color: #7a6060; border: 1px solid #482f2f; }
+        """)
         self.btn_stop_dl.setEnabled(False)
         self.btn_stop_dl.clicked.connect(self.stop_download)
         btn_dl_layout.addStretch()
@@ -1707,9 +1840,9 @@ class LyraMainWindow(QMainWindow):
         # ✅ FIX: QProgressBar visual na coluna de progresso
         _PROGRESS_STYLE = """
             QProgressBar {
-                border: 1px solid #555; border-radius: 3px;
-                background-color: #2d2d2d; text-align: center;
-                color: white; font-size: 11px;
+                border: 1px solid #484848; border-radius: 3px;
+                background-color: #242424; text-align: center;
+                color: #e0e0e0; font-size: 11px; margin: 2px 4px;
             }
             QProgressBar::chunk {
                 background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -1724,14 +1857,18 @@ class LyraMainWindow(QMainWindow):
         progress_bar.setFormat(tr("status_ready"))
         progress_bar.setStyleSheet(_PROGRESS_STYLE)
         self.table_files.setCellWidget(row, 7, progress_bar)
+        self._update_empty_state()
 
     def remove_selected_files(self):
         if self.is_converting: return
         for row in sorted([r.topRow() for r in self.table_files.selectedRanges()], reverse=True):
             self.table_files.removeRow(row)
+        self._update_empty_state()
 
     def clear_table(self):
-        if not self.is_converting: self.table_files.setRowCount(0)
+        if not self.is_converting:
+            self.table_files.setRowCount(0)
+            self._update_empty_state()
 
     def get_ui_options(self):
         fade_pos_tokens = ["none", "start", "end", "both"]
@@ -1847,8 +1984,8 @@ class LyraMainWindow(QMainWindow):
                     bar.setValue(0)
                     bar.setFormat(tr("status_ready"))
                     bar.setStyleSheet("""
-                        QProgressBar { border:1px solid #555; border-radius:3px;
-                            background-color:#2d2d2d; text-align:center; color:white; font-size:11px; }
+                        QProgressBar { border:1px solid #484848; border-radius:3px;
+                            background-color:#242424; text-align:center; color:#e0e0e0; font-size:11px; margin:2px 4px; }
                         QProgressBar::chunk { background-color:qlineargradient(
                             x1:0,y1:0,x2:1,y2:0, stop:0 #1565C0, stop:1 #42A5F5);
                             border-radius:2px; }
@@ -1964,7 +2101,7 @@ class LyraMainWindow(QMainWindow):
                 bar.setFormat(tr("status_completed"))
                 bar.setStyleSheet("""
                     QProgressBar { border:1px solid #2E7D32; border-radius:3px;
-                        background-color:#1B5E20; text-align:center; color:white; font-size:11px; }
+                        background-color:#1B5E20; text-align:center; color:white; font-size:11px; margin:2px 4px; }
                     QProgressBar::chunk { background-color:#4CAF50; border-radius:2px; }
                 """)
             else:
@@ -1972,7 +2109,7 @@ class LyraMainWindow(QMainWindow):
                 bar.setFormat(tr("status_error"))
                 bar.setStyleSheet("""
                     QProgressBar { border:1px solid #B71C1C; border-radius:3px;
-                        background-color:#4a1a1a; text-align:center; color:white; font-size:11px; }
+                        background-color:#4a1a1a; text-align:center; color:white; font-size:11px; margin:2px 4px; }
                     QProgressBar::chunk { background-color:#EF5350; border-radius:2px; }
                 """)
         else:
@@ -2444,9 +2581,13 @@ class LyraMainWindow(QMainWindow):
                 tr("th_skip"), tr("th_file"), tr("th_size"), tr("th_duration"),
                 tr("th_est_size"), tr("th_elapsed"), tr("th_remaining"), tr("th_progress")
             ])
+        if hasattr(self, 'lbl_empty_state'):
+            self.lbl_empty_state.setText(tr("empty_table_hint"))
 
         if hasattr(self, 'lbl_dest_title'):
             self.lbl_dest_title.setText(tr("lbl_destination"))
+        if hasattr(self, 'lbl_if_exists'):
+            self.lbl_if_exists.setText(tr("lbl_if_exists"))
         if hasattr(self, 'combo_exist_action') and self.combo_exist_action.count() >= 3:
             self.combo_exist_action.setItemText(0, tr("exist_overwrite"))
             self.combo_exist_action.setItemText(1, tr("exist_rename"))

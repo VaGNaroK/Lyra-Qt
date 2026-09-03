@@ -170,11 +170,19 @@ def test_ytdlp_engine_canonical_tokens_support(resource_dir):
 
 
 def test_gui_live_retranslation(qtbot, resource_dir):
-    with patch('gui.mpv_widget.MPVPlayerWidget'):
+    from PySide6.QtWidgets import QWidget
+    class MockMPVWidget(QWidget):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.mpv = None
+        def setMinimumHeight(self, h):
+            pass
+
+    with patch('gui.mpv_widget.MPVPlayerWidget', MockMPVWidget):
         from gui.main_window import LyraMainWindow
         from core.i18n import i18n
         
-        window = LyraMainWindow("1.1.23", resource_dir)
+        window = LyraMainWindow("1.1.24", resource_dir)
         qtbot.addWidget(window)
 
         # 1. Muda para inglês
@@ -183,21 +191,24 @@ def test_gui_live_retranslation(qtbot, resource_dir):
         assert window.btn_stop.text() == "🛑 Stop"
         assert window.lbl_format.text() == "🎬 Format:"
         assert window.action_add_file.text() == "📄 Add File"
-        assert window.table_files.horizontalHeaderItem(0).text() == "⏭️ Skip"
+        assert window.table_files.horizontalHeaderItem(0).text() == "☑️ Convert"
+        assert window.lbl_if_exists.text() == "⚠️ If file exists:"
 
         # 2. Muda para espanhol
         i18n.set_language("es_ES", persist=False)
         assert window.btn_convert.text() == "🚀 Convertir"
         assert window.lbl_format.text() == "🎬 Formato:"
         assert window.action_add_file.text() == "📄 Añadir Archivo"
-        assert window.table_files.horizontalHeaderItem(0).text() == "⏭️ Omitir"
+        assert window.table_files.horizontalHeaderItem(0).text() == "☑️ Convertir"
+        assert window.lbl_if_exists.text() == "⚠️ Si ya existe:"
 
         # 3. Retorna para português
         i18n.set_language("pt_BR", persist=False)
         assert window.btn_convert.text() == "🚀 Converter"
         assert window.lbl_format.text() == "🎬 Formato:"
         assert window.action_add_file.text() == "📄 Adicionar Arquivo"
-        assert window.table_files.horizontalHeaderItem(0).text() == "⏭️ Pular"
+        assert window.table_files.horizontalHeaderItem(0).text() == "☑️ Converter"
+        assert window.lbl_if_exists.text() == "⚠️ Se já existir:"
 
 
 def test_qt_context_menu_translations(qtbot, resource_dir):

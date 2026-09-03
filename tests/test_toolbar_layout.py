@@ -14,7 +14,7 @@ def resource_dir():
 @pytest.fixture
 def main_window(qtbot, resource_dir):
     """Cria uma instância da LyraMainWindow para testes de layout de UI."""
-    win = LyraMainWindow("1.1.23", resource_dir)
+    win = LyraMainWindow("1.1.24", resource_dir)
     qtbot.addWidget(win)
     with qtbot.waitExposed(win):
         win.show()
@@ -133,4 +133,105 @@ def test_responsive_toolbar_buttons_scaling(main_window):
     assert main_window.btn_convert.isVisible()
     assert main_window.btn_stop.isVisible()
     assert main_window.combo_language.isVisible()
+
+
+def test_destination_and_conflict_layout_order(main_window):
+    """
+    🔒 FIX / Regressão (Bug 40): Garante que o painel de Destino e a opção de Conflito
+    ('Se já existir') estão desacoplados e na ordem semântica correta.
+    """
+    i18n.set_language("pt_BR", persist=False)
+    assert hasattr(main_window, "lbl_dest_title")
+    assert hasattr(main_window, "lbl_dest_path")
+    assert hasattr(main_window, "lbl_if_exists")
+    assert hasattr(main_window, "combo_exist_action")
+
+    # Verifica se os textos são distintos e não sobrepostos
+    assert "Destino" in main_window.lbl_dest_title.text()
+    assert "existir" in main_window.lbl_if_exists.text()
+
+
+def test_master_checkbox_toggle_all(main_window, tmp_path):
+    """
+    🔒 UX: Testa se o clique no cabeçalho da coluna 0 funciona como Checkbox Mestre,
+    alternando a seleção de todos os arquivos entre Checked e Unchecked.
+    """
+    from PySide6.QtCore import Qt
+
+    # Limpa a tabela inicialmente
+    main_window.clear_table()
+    assert main_window.table_files.rowCount() == 0
+
+    # Cria 3 arquivos temporários válidos
+    files = []
+    for i in range(3):
+        f = tmp_path / f"test_media_{i}.mp4"
+        f.write_bytes(b"dummy video data")
+        files.append(str(f))
+        main_window.add_file_to_table(str(f))
+
+    assert main_window.table_files.rowCount() == 3
+
+    # Todos devem iniciar como Checked
+    for r in range(3):
+        assert main_window.table_files.item(r, 0).checkState() == Qt.Checked
+
+    # 1. Clique no cabeçalho: como todos estão marcados, deve desmarcar todos
+    main_window._on_table_header_clicked(0)
+    for r in range(3):
+        assert main_window.table_files.item(r, 0).checkState() == Qt.Unchecked
+
+    # 2. Clique no cabeçalho novamente: deve marcar todos
+    main_window._on_table_header_clicked(0)
+    for r in range(3):
+        assert main_window.table_files.item(r, 0).checkState() == Qt.Checked
+
+    # 3. Desmarca apenas um: clique deve marcar todos
+    main_window.table_files.item(1, 0).setCheckState(Qt.Unchecked)
+    main_window._on_table_header_clicked(0)
+    for r in range(3):
+        assert main_window.table_files.item(r, 0).checkState() == Qt.Checked
+
+    main_window.clear_table()
+
+
+def test_empty_state_visibility(main_window, tmp_path):
+    """
+    🔒 UX: Testa se a dica de arraste de arquivos (Empty State) é exibida quando a tabela
+    está vazia e é ocultada quando houver arquivos adicionados.
+    """
+    assert hasattr(main_window, "lbl_empty_state")
+    main_window.clear_table()
+
+    # Tabela vazia: empty state visível
+    assert main_window.table_files.rowCount() == 0
+    assert main_window.lbl_empty_state.isVisible()
+
+    # Adiciona arquivo: empty state deve ficar oculto
+    f = tmp_path / "sample.mp4"
+    f.write_bytes(b"sample data")
+    main_window.add_file_to_table(str(f))
+    assert main_window.table_files.rowCount() == 1
+    assert not main_window.lbl_empty_state.isVisible()
+
+    # Limpa tabela: empty state deve reaparecer
+    main_window.clear_table()
+    assert main_window.table_files.rowCount() == 0
+    assert main_window.lbl_empty_state.isVisible()
+
+
+def test_action_buttons_styling_and_disabled_states(main_window):
+    """
+    🔒 FIX / UX: Garante que os botões de ação contêm estilos CSS explícitos para :disabled,
+    evitando que fiquem vermelhos/ativos enquanto desabilitados.
+    """
+    assert not main_window.btn_stop.isEnabled()
+    stop_style = main_window.btn_stop.styleSheet()
+    assert ":disabled" in stop_style
+    assert ":hover" in stop_style
+
+    convert_style = main_window.btn_convert.styleSheet()
+    assert ":disabled" in convert_style
+    assert ":hover" in convert_style
+
 
