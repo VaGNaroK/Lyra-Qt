@@ -60,11 +60,11 @@ if [ "$OPTION" == "1" ] || [ "$OPTION" == "3" ]; then
         sudo apt install flatpak-builder -y
     fi
 
-    echo "🔧 Verificando e instalando dependências do Flathub (KDE Sdk 6.8)..."
+    echo "🔧 Verificando e instalando dependências do Flathub (KDE Sdk 6.9)..."
     # Adiciona o repositório Flathub se não existir
     flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
     # Instala o SDK necessário para compilar o app (dependência listada no README)
-    flatpak install flathub org.kde.Sdk/x86_64/6.8 -y
+    flatpak install flathub org.kde.Sdk/x86_64/6.9 -y
 
     # 3.2. Gerar Repositório Local
     echo "🔨 Compilando o projeto em um repositório local (flatpak-builder)..."

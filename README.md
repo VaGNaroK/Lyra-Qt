@@ -106,9 +106,9 @@ Como o pacote standalone (`.flatpak`) do Lyra gerado localmente não possui aces
 **Para corrigir:** Basta instalar a plataforma base do KDE via Flathub antes de instalar o aplicativo:
 ```bash
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install flathub org.kde.Platform/x86_64/6.7
+flatpak install flathub org.kde.Platform/x86_64/6.9
 ```
-> *(Nota: Ajuste a versão `6.7` para a versão exata que o terminal solicitar).*
+> *(Nota: Ajuste a versão `6.9` para a versão exata que o terminal solicitar).*
 
 ### 2. Aceleração de Hardware (NVENC/CUDA) Falhando Após Atualizar o Linux
 Se você usa placa de vídeo **NVIDIA**, atualizou o driver recentemente no seu sistema operacional (host) e o Lyra em Flatpak repentinamente começou a exibir o erro **`Cannot load libcuda.so.1`** ou **`Operation not permitted`** ao usar aceleração de hardware:
