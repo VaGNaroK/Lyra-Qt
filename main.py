@@ -66,6 +66,14 @@ if sys.platform == "win32":
                         os.remove(zone_id_path)
             except Exception:
                 pass
+else:
+    # 🔒 INJEÇÃO DE PATH PARA BINÁRIOS EMBUTIDOS (LINUX / FLATPAK)
+    local_bin_dir = os.path.join(RESOURCE_DIR, "assets", "bin")
+    if os.path.isdir(local_bin_dir):
+        current_paths = os.environ.get("PATH", "").split(os.pathsep)
+        if local_bin_dir not in current_paths:
+            os.environ["PATH"] = local_bin_dir + os.pathsep + os.environ.get("PATH", "")
+
 # ==============================================================================
 # 🔒 INJEÇÃO DE CUDA PATH (CRÍTICO PARA LINUX VENV)
 # Garante que as bibliotecas da NVIDIA instaladas via pip sejam carregadas no ONNX

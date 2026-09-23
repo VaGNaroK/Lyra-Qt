@@ -22,3 +22,21 @@ def test_resolve_resource_dir_frozen(monkeypatch):
     monkeypatch.setattr(sys, "_MEIPASS", "/tmp/mock_meipass", raising=False)
     
     assert _resolve_resource_dir() == "/tmp/mock_meipass"
+
+
+def test_resolve_resource_dir_flatpak(monkeypatch, tmp_path):
+    """
+    Testa a resolução de diretório quando rodando em sandbox Flatpak.
+    """
+    if hasattr(sys, "frozen"):
+        monkeypatch.delattr(sys, "frozen", raising=False)
+
+    monkeypatch.setenv("FLATPAK_ID", "com.github.vagnarok.lyra")
+    from unittest.mock import patch
+
+    with patch("os.path.isdir", side_effect=lambda p: p == "/app/share/lyra"):
+        from main import _resolve_resource_dir
+        # Re-import ou chamada direta com flatpak mockado
+        monkeypatch.setattr("main.IS_FLATPAK", True)
+        assert _resolve_resource_dir() == "/app/share/lyra"
+
