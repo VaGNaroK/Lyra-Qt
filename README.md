@@ -79,36 +79,52 @@ O Lyra-Qt possui um script unificado (`auto_build.sh`) que extrai a versão atua
 
 ### Como compilar e instalar:
 
-Conceda permissão de execução ao script (necessário apenas na primeira vez):
+O método recomendado é utilizar o script de automação, que resolve automaticamente todas as dependências do Flathub (`org.kde.Platform 6.9`, `org.kde.Sdk 6.9` e `ffmpeg-full 24.08`):
 
 ```bash
 chmod +x build_scripts/auto_build.sh
-```
-
-Execute o script interativo:
-
-```bash
 ./build_scripts/auto_build.sh
 ```
 
 O script perguntará:
 1. Qual formato você deseja gerar (`1` para Flatpak ou `2` para Debian .deb).
 2. Se você deseja realizar a instalação automática no sistema após a compilação.
-3. (Apenas no Flatpak) Se a instalação deve ser feita para o usuário atual (`user`) ou para todos (`system`).
+3. Se deseja limpar os caches temporários de build ao final.
 
 Ao final do processo, caso você escolha não instalar automaticamente, o pacote final (`.deb` ou `.flatpak`) será gerado na pasta raiz do projeto.
 
+### 🛠️ Compilação Manual para Desenvolvedores (Flatpak)
+
+Caso prefira compilar manualmente sem o script interativo, instale previamente o `flatpak-builder` e o conjunto exato de dependências do SDK/Platform KDE 6.9 via Flathub:
+
+```bash
+# 1. Instalar o flatpak-builder (Debian/Ubuntu/Mint)
+sudo apt install flatpak-builder -y
+
+# 2. Instalar o SDK, Platform e extensões de codecs no perfil do usuário
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --user -y flathub \
+    org.kde.Platform/x86_64/6.9 \
+    org.kde.Sdk/x86_64/6.9 \
+    org.freedesktop.Platform.ffmpeg-full/x86_64/24.08
+
+# 3. Compilar o projeto e gerar o repositório local
+flatpak-builder --repo=lyra-repo --force-clean diretorio-build build_scripts/com.github.vagnarok.lyra.yml
+
+# 4. Empacotar o bundle standalone instalável (.flatpak)
+flatpak build-bundle lyra-repo Lyra-Qt.flatpak com.github.vagnarok.lyra stable
+```
+
 ## ⚠️ Solução de Problemas Comuns (Flatpak)
 
-### 1. Erro de Runtime Ausente na Instalação
-Como o pacote standalone (`.flatpak`) do Lyra gerado localmente não possui acesso à internet para baixar a sua própria base automaticamente, você pode receber o erro: *"requer o runtime org.kde.Platform... que não foi localizado"*.
+### 1. Erro de Runtime Ausente na Instalação do Pacote Standalone
+Como o pacote standalone (`.flatpak`) do Lyra gerado localmente não possui acesso à internet durante a instalação para baixar a sua própria base automaticamente, o sistema pode exibir o alerta: *"requer o runtime org.kde.Platform... que não foi localizado"*.
 
-**Para corrigir:** Basta instalar a plataforma base do KDE via Flathub antes de instalar o aplicativo:
+**Para corrigir:** Basta instalar o runtime da plataforma base do KDE via Flathub:
 ```bash
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install flathub org.kde.Platform/x86_64/6.9
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --user flathub org.kde.Platform/x86_64/6.9
 ```
-> *(Nota: Ajuste a versão `6.9` para a versão exata que o terminal solicitar).*
 
 ### 2. Aceleração de Hardware (NVENC/CUDA) Falhando Após Atualizar o Linux
 Se você usa placa de vídeo **NVIDIA**, atualizou o driver recentemente no seu sistema operacional (host) e o Lyra em Flatpak repentinamente começou a exibir o erro **`Cannot load libcuda.so.1`** ou **`Operation not permitted`** ao usar aceleração de hardware:

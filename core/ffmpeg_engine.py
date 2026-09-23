@@ -558,7 +558,10 @@ class FFmpegEngine(QObject):
         # ✅ FIX: Trabalhar sempre com cópia para evitar mutação do snapshot da fila de lote
         options = dict(options)
         # 1. Base Configuration
-        ffmpeg_bin = options.get("ffmpeg_path", "ffmpeg")
+        ffmpeg_bin = options.get("ffmpeg_path")
+        # 🔒 FIX: Se não especificado ou for o padrão genérico 'ffmpeg'/'ffmpeg.exe', prioriza o binário local embutido resolvido pelo motor
+        if not ffmpeg_bin or ffmpeg_bin in ("ffmpeg", "ffmpeg.exe"):
+            ffmpeg_bin = self.ffmpeg_bin
         cmd = [ffmpeg_bin, "-y", "-hide_banner"]
 
         ext_destino = os.path.splitext(output_file)[1].lower().replace(".", "")
@@ -852,7 +855,8 @@ class FFmpegEngine(QObject):
             if vcodec != "default":
                 cmd.extend(["-c:v", vcodec])
                 if "nvenc" in vcodec:
-                    cmd.extend(["-preset", "p7", "-profile:v", "high", "-tune", "hq", "-cq", "18", "-spatial-aq", "1", "-temporal-aq", "1", "-rc-lookahead", "32", "-b_ref_mode", "2"])
+                    # 🔒 FIX: Não injeta -cq estático aqui para evitar duplicidade com o controle de CRF/Bitrate
+                    cmd.extend(["-preset", "p7", "-profile:v", "high", "-tune", "hq", "-spatial-aq", "1", "-temporal-aq", "1", "-rc-lookahead", "32", "-b_ref_mode", "2"])
                 elif vcodec in ["libx264", "libx265"]:
                     # Injeção Handbrake
                     if adv:
@@ -911,6 +915,9 @@ class FFmpegEngine(QObject):
                     else:
                         if kbps is not None and kbps > 0:
                             cmd.extend(["-maxrate", vbitrate, "-bufsize", f"{kbps * 2}k"])
+                elif is_nvenc:
+                    # Fallback seguro de qualidade constante para NVENC caso nem CRF nem bitrate estejam definidos
+                    cmd.extend(["-cq", "23"])
 
             acodec = options.get("acodec", "default")
             if acodec != "default": cmd.extend(["-c:a", acodec])

@@ -376,3 +376,119 @@ def test_nvenc_scale_cpu_fallback_when_watermark_active(engine, tmp_path):
     assert "scale=" in cmd_str
     assert "flags=lanczos" in cmd_str
     assert "scale_npp" not in cmd_str
+
+
+# ==============================================================================
+# Testes de Resolução de Binário e Argumentos NVENC (Bug 42)
+# ==============================================================================
+
+def test_build_ffmpeg_command_binary_priority(engine):
+    """
+    Testa que options['ffmpeg_path'] genérico ('ffmpeg', 'ffmpeg.exe', '', None)
+    recorre prioritariamente para engine.ffmpeg_bin (binário local embutido).
+    Também testa que caminho customizado explícito é respeitado.
+    """
+    engine.ffmpeg_bin = "/app/share/lyra/assets/bin/ffmpeg"
+
+    # Casos padrão/genéricos devem usar o engine.ffmpeg_bin
+    assert engine.build_ffmpeg_command("in.mp4", "out.mp4", {})[0] == "/app/share/lyra/assets/bin/ffmpeg"
+    assert engine.build_ffmpeg_command("in.mp4", "out.mp4", {"ffmpeg_path": "ffmpeg"})[0] == "/app/share/lyra/assets/bin/ffmpeg"
+    assert engine.build_ffmpeg_command("in.mp4", "out.mp4", {"ffmpeg_path": "ffmpeg.exe"})[0] == "/app/share/lyra/assets/bin/ffmpeg"
+    assert engine.build_ffmpeg_command("in.mp4", "out.mp4", {"ffmpeg_path": ""})[0] == "/app/share/lyra/assets/bin/ffmpeg"
+
+    # Caminho personalizado deve ser preservado
+    custom_path = "/usr/local/bin/custom-ffmpeg"
+    cmd_custom = engine.build_ffmpeg_command("in.mp4", "out.mp4", {"ffmpeg_path": custom_path})
+    assert cmd_custom[0] == custom_path
+
+
+def test_ffmpeg_bin_cross_platform_resolution(monkeypatch, tmp_path):
+    """
+    Testa a resolução de ffmpeg_bin e ffprobe_bin em ambientes Windows (.exe) e Linux.
+    """
+    import sys
+    bin_dir = tmp_path / "assets" / "bin"
+    bin_dir.mkdir(parents=True)
+
+    # 1. Simulação Windows
+    (bin_dir / "ffmpeg.exe").write_text("")
+    (bin_dir / "ffprobe.exe").write_text("")
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    engine_win = FFmpegEngine(resource_dir=str(tmp_path))
+    assert engine_win.ffmpeg_bin.endswith("ffmpeg.exe")
+    assert engine_win.ffprobe_bin.endswith("ffprobe.exe")
+
+    # 2. Simulação Linux
+    (bin_dir / "ffmpeg").write_text("")
+    (bin_dir / "ffprobe").write_text("")
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    engine_linux = FFmpegEngine(resource_dir=str(tmp_path))
+    assert engine_linux.ffmpeg_bin.endswith("ffmpeg")
+    assert not engine_linux.ffmpeg_bin.endswith(".exe")
+    assert engine_linux.ffprobe_bin.endswith("ffprobe")
+    assert not engine_linux.ffprobe_bin.endswith(".exe")
+
+
+def test_nvenc_cq_flags_no_duplication_with_crf(engine):
+    """
+    Testa que ao codificar com NVENC e CRF ativado, a flag -cq não é duplicada
+    (eliminando o antigo conflito entre -cq 18 estático e -cq do CRF).
+    """
+    options = {
+        "vcodec": "h264_nvenc",
+        "crf_enabled": True,
+        "crf_value": 23,
+    }
+    cmd = engine.build_ffmpeg_command("input.mp4", "output.mp4", options)
+
+    # -cq deve ocorrer exatamente 1 vez na lista
+    assert cmd.count("-cq") == 1
+    assert cmd[cmd.index("-cq") + 1] == "23"
+    assert "18" not in cmd  # Não deve haver o antigo -cq 18 estático
+
+    # -qmin e -qmax devem acompanhar o CRF
+    assert "-qmin" in cmd and cmd[cmd.index("-qmin") + 1] == "23"
+    assert "-qmax" in cmd and cmd[cmd.index("-qmax") + 1] == "23"
+
+    # Presets NVENC de alto desempenho mantidos
+    assert "-preset" in cmd and cmd[cmd.index("-preset") + 1] == "p7"
+    assert "-tune" in cmd and cmd[cmd.index("-tune") + 1] == "hq"
+    assert "-profile:v" in cmd and cmd[cmd.index("-profile:v") + 1] == "high"
+
+
+def test_nvenc_bitrate_mode_no_cq(engine):
+    """
+    Testa que no modo taxa de bits (CRF desativado), o NVENC não injeta -cq,
+    utilizando corretamente -b:v e -maxrate.
+    """
+    options = {
+        "vcodec": "h264_nvenc",
+        "crf_enabled": False,
+        "vbitrate": "5M",
+    }
+    cmd = engine.build_ffmpeg_command("input.mp4", "output.mp4", options)
+
+    assert "-cq" not in cmd
+    assert "-qmin" not in cmd
+    assert "-qmax" not in cmd
+    assert "-b:v" in cmd and cmd[cmd.index("-b:v") + 1] == "5M"
+    assert "-maxrate" in cmd and cmd[cmd.index("-maxrate") + 1] == "5M"
+
+
+def test_nvenc_default_fallback_cq(engine):
+    """
+    Testa que se nem CRF nem bitrate forem informados, o NVENC recebe
+    o fallback seguro -cq 23 sem duplicidade.
+    """
+    options = {
+        "vcodec": "h264_nvenc",
+        "crf_enabled": False,
+        "vbitrate": "default",
+    }
+    cmd = engine.build_ffmpeg_command("input.mp4", "output.mp4", options)
+
+    assert cmd.count("-cq") == 1
+    assert cmd[cmd.index("-cq") + 1] == "23"
+

@@ -1581,7 +1581,8 @@ class LyraMainWindow(QMainWindow):
 
         self.entry_extra_args = QLineEdit()
         self.entry_extra_args.setPlaceholderText(tr("ph_extra_ffmpeg_args"))
-        self.entry_ffmpeg_path = QLineEdit("ffmpeg")
+        default_ffmpeg = self.engine.ffmpeg_bin if hasattr(self, 'engine') and hasattr(self.engine, 'ffmpeg_bin') else "ffmpeg"
+        self.entry_ffmpeg_path = QLineEdit(default_ffmpeg)
 
         self.lbl_threads_title = QLabel(tr("lbl_cpu_threads"))
         self.lbl_extra_args_title = QLabel(tr("lbl_extra_ffmpeg_args"))
@@ -2357,7 +2358,8 @@ class LyraMainWindow(QMainWindow):
             self.entry_meta_comment.setText("")
             
         if hasattr(self, 'entry_ffmpeg_path'):
-            self.entry_ffmpeg_path.setText("ffmpeg")
+            default_ffmpeg = self.engine.ffmpeg_bin if hasattr(self, 'engine') and hasattr(self.engine, 'ffmpeg_bin') else "ffmpeg"
+            self.entry_ffmpeg_path.setText(default_ffmpeg)
 
         if hasattr(self, 'chk_enable_trim'):
             self.chk_enable_trim.setChecked(False)
