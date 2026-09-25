@@ -1,16 +1,9 @@
 app-id: com.github.vagnarok.lyra
 branch: stable
 runtime: org.kde.Platform
-runtime-version: '6.9'
+runtime-version: '6.11'
 sdk: org.kde.Sdk
 command: lyra
-
-add-extensions:
-  org.freedesktop.Platform.ffmpeg-full:
-    directory: lib/ffmpeg
-    version: '24.08'
-    add-ld-path: .
-    autodownload: true
 
 finish-args:
   - --socket=fallback-x11
@@ -91,9 +84,11 @@ modules:
   - name: libmpv
     buildsystem: meson
     build-options:
-      cflags: "-Wno-error=incompatible-pointer-types"
+      cflags: "-O2 -DNDEBUG -Wno-error=incompatible-pointer-types"
     config-opts:
       - --libdir=lib
+      - -Dbuildtype=release
+      - -Ddebug=false
       - -Dlibmpv=true
       - -Dcplayer=false
       - -Dalsa=disabled
@@ -122,7 +117,6 @@ modules:
         path: ..
     build-commands:
       # Criação da estrutura de pastas
-      - mkdir -p /app/lib/ffmpeg
       - mkdir -p /app/share/lyra
       - mkdir -p /app/bin
       - mkdir -p /app/share/applications
@@ -188,6 +182,9 @@ modules:
     buildsystem: autotools
     config-opts:
       - --prefix=/app/share/lyra/assets
+      # 🔒 FIX: Desativa documentação para evitar falha com Texinfo 7.1+ (KDE SDK 6.11 / Freedesktop 25.08)
+      # Erro evitado: Can't locate object method "gdt" via package "Texinfo::Convert::HTML" at ./doc/t2h.pm
+      - --disable-doc
       - --enable-gpl
       - --enable-version3
       - --enable-nonfree

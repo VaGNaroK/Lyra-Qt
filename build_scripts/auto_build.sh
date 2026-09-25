@@ -60,14 +60,13 @@ if [ "$OPTION" == "1" ] || [ "$OPTION" == "3" ]; then
         sudo apt install flatpak-builder -y
     fi
 
-    echo "🔧 Verificando e instalando dependências do Flathub (KDE Platform e Sdk 6.9)..."
+    echo "🔧 Verificando e instalando dependências do Flathub (KDE Platform e Sdk 6.11)..."
     # Adiciona o repositório Flathub a nível de usuário se não existir
     flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-    # Instala tanto o Platform (Runtime) quanto o Sdk e ffmpeg-full necessários para o build
+    # Instala tanto o Platform (Runtime) quanto o Sdk necessários para o build
     flatpak install --user --noninteractive -y flathub \
-        org.kde.Platform/x86_64/6.9 \
-        org.kde.Sdk/x86_64/6.9 \
-        org.freedesktop.Platform.ffmpeg-full/x86_64/24.08
+        org.kde.Platform/x86_64/6.11 \
+        org.kde.Sdk/x86_64/6.11
 
     # 3.2. Gerar Repositório Local
     echo "🔨 Compilando o projeto em um repositório local (flatpak-builder)..."

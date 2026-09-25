@@ -79,7 +79,7 @@ O Lyra-Qt possui um script unificado (`auto_build.sh`) que extrai a versão atua
 
 ### Como compilar e instalar:
 
-O método recomendado é utilizar o script de automação, que resolve automaticamente todas as dependências do Flathub (`org.kde.Platform 6.9`, `org.kde.Sdk 6.9` e `ffmpeg-full 24.08`):
+O método recomendado é utilizar o script de automação, que resolve automaticamente todas as dependências do Flathub (`org.kde.Platform 6.11` e `org.kde.Sdk 6.11`):
 
 ```bash
 chmod +x build_scripts/auto_build.sh
@@ -95,18 +95,17 @@ Ao final do processo, caso você escolha não instalar automaticamente, o pacote
 
 ### 🛠️ Compilação Manual para Desenvolvedores (Flatpak)
 
-Caso prefira compilar manualmente sem o script interativo, instale previamente o `flatpak-builder` e o conjunto exato de dependências do SDK/Platform KDE 6.9 via Flathub:
+Caso prefira compilar manualmente sem o script interativo, instale previamente o `flatpak-builder` e o conjunto exato de dependências do SDK/Platform KDE 6.11 via Flathub:
 
 ```bash
 # 1. Instalar o flatpak-builder (Debian/Ubuntu/Mint)
 sudo apt install flatpak-builder -y
 
-# 2. Instalar o SDK, Platform e extensões de codecs no perfil do usuário
+# 2. Instalar o SDK e Runtime KDE 6.11 no perfil do usuário
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user -y flathub \
-    org.kde.Platform/x86_64/6.9 \
-    org.kde.Sdk/x86_64/6.9 \
-    org.freedesktop.Platform.ffmpeg-full/x86_64/24.08
+    org.kde.Platform/x86_64/6.11 \
+    org.kde.Sdk/x86_64/6.11
 
 # 3. Compilar o projeto e gerar o repositório local
 flatpak-builder --repo=lyra-repo --force-clean diretorio-build build_scripts/com.github.vagnarok.lyra.yml
@@ -123,7 +122,7 @@ Como o pacote standalone (`.flatpak`) do Lyra gerado localmente não possui aces
 **Para corrigir:** Basta instalar o runtime da plataforma base do KDE via Flathub:
 ```bash
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --user flathub org.kde.Platform/x86_64/6.9
+flatpak install --user flathub org.kde.Platform/x86_64/6.11
 ```
 
 ### 2. Aceleração de Hardware (NVENC/CUDA) Falhando Após Atualizar o Linux
