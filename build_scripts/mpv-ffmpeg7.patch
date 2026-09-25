@@ -126,3 +126,35 @@
  
      av_opt_set_int(p->avrctx_out, "in_sample_fmt",      out_samplefmtp, 0);
      av_opt_set_int(p->avrctx_out, "out_sample_fmt",     out_samplefmt, 0);
+
+--- a/options/m_option.h
++++ b/options/m_option.h
+@@ -231,6 +231,7 @@ struct m_geometry {
+ // through this union. It serves for self-documentation and to get minimal
+ // size/alignment requirements for option values in general.
+ union m_option_value {
++    char *pad_ptr[8];
+     bool bool_;
+     int flag; // not the C type "bool"!
+     int int_;
+--- a/options/m_config_frontend.c
++++ b/options/m_config_frontend.c
+@@ -758,7 +758,8 @@ int m_config_set_option_cli(struct m_config *config, struct bstr name,
+                    BSTR_P(name), BSTR_P(param), flags);
+     }
+ 
+-    union m_option_value val = {0};
++    union m_option_value val;
++    memset(&val, 0, sizeof(val));
+ 
+     // Some option types are "impure" and work on the existing data.
+     // (Prime examples: --vf-add, --sub-file)
+@@ -792,7 +793,8 @@ int m_config_set_option_node(struct m_config *config, bstr name,
+ 
+     // Do this on an "empty" type to make setting the option strictly overwrite
+     // the old value, as opposed to e.g. appending to lists.
+-    union m_option_value val = {0};
++    union m_option_value val;
++    memset(&val, 0, sizeof(val));
+ 
+     if (data->format == MPV_FORMAT_STRING) {
